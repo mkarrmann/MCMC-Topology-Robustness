@@ -208,6 +208,7 @@ def main():
         z += 1
         if z % config["HIST_OUTPUT"] == 0:
             print("step ", z)
+        print(z)
         face = random.choice(faces)
 
 
@@ -267,7 +268,7 @@ def main():
             chain_output['rep_seat_data'].append(chain_output['rep_seat_data'][-1])
             chain_output['score'].append(chain_output['score'][-1])
 
-        mean_seats_data = [[]]
+    mean_seats_data = [[]]
     for i in range(0,(len(chain_output['rep_seat_data']) - config['HIST_OUTPUT']) + 1, config['HIST_OUTPUT']):
         for election in chain_output['rep_seat_data'][i:i+config['HIST_OUTPUT']]:
             mean_seats_data[-1].append((sum(election)/len(election)))
@@ -291,8 +292,8 @@ if __name__ ==  '__main__':
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'uniform',
-        'GERRYCHAIN_STEPS' : 250,
-        'CHAIN_STEPS' : 3000,
+        'GERRYCHAIN_STEPS' : 2,
+        'CHAIN_STEPS' : 30,
         'TEMPERATURE' : 1,
         "NUM_DISTRICTS": 12,
         'STATE_NAME': 'North Carolina',
