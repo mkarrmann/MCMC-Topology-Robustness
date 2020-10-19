@@ -1,0 +1,28 @@
+Unable to init server: Could not connect: Connection refused
+Unable to init server: Could not connect: Connection refused
+
+(chain_on_subsets_of_faces.py:814803): Gdk-CRITICAL **: 13:48:19.458: gdk_cursor_new_for_display: assertion 'GDK_IS_DISPLAY (display)' failed
+Unable to init server: Could not connect: Connection refused
+Unable to init server: Could not connect: Connection refused
+
+(chain_on_subsets_of_faces.py:844688): Gdk-CRITICAL **: 20:46:13.355: gdk_cursor_new_for_display: assertion 'GDK_IS_DISPLAY (display)' failed
+Traceback (most recent call last):
+  File "chain_on_subsets_of_faces.py", line 301, in <module>
+    main()
+  File "chain_on_subsets_of_faces.py", line 238, in main
+    for part in exp_chain:
+  File "/home/imark/.local/lib/python3.8/site-packages/gerrychain/chain.py", line 67, in __next__
+    proposed_next_state = self.proposal(self.state)
+  File "/home/imark/.local/lib/python3.8/site-packages/gerrychain/proposals/tree_proposals.py", line 42, in recom
+    flips = recursive_tree_part(
+  File "/home/imark/.local/lib/python3.8/site-packages/gerrychain/tree.py", line 217, in recursive_tree_part
+    nodes = method(
+  File "/vol01/home/imark/north_carolina_analysis/facefinder.py", line 298, in my_mst_bipartition_tree_random
+    spanning_tree = get_spanning_tree_mst(graph)
+  File "/vol01/home/imark/north_carolina_analysis/facefinder.py", line 305, in get_spanning_tree_mst
+    graph.edges[edge]["weight"] = random.random()
+  File "/home/imark/.local/lib/python3.8/site-packages/networkx/classes/reportviews.py", line 1016, in __getitem__
+    return self._adjdict[u][v]
+  File "/home/imark/.local/lib/python3.8/site-packages/networkx/classes/coreviews.py", line 321, in __getitem__
+    if node in self._atlas and self.NODE_OK(node):
+KeyboardInterrupt
