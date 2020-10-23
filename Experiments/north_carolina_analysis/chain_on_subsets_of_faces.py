@@ -4,12 +4,13 @@ import numpy as np
 import pandas as pd
 import random
 import csv
+import copy
+import tqdm
 import statistics
 import math
 import gerrychain
 import networkx
 import matplotlib as mpl 
-mpl.use('agg')
 import matplotlib.pyplot as plt
 import networkx as nx
 from functools import partial
@@ -200,29 +201,25 @@ def main():
     chain_output = { 'dem_seat_data': [], 'rep_seat_data':[], 'score':[] }
     #start with small score to move in right direction
     chain_output['score'].append(1/ 1100000)
-
-
+    print("Choosing", math.floor(len(faces) * config['PERCENT_FACES']), "faces of the dual graph at each step")
 
     z = 0
-    for i in range(steps):
+    for i in tqdm.tqdm(range(steps), ncols = 100, desc="Chain Progress"):
+        itr_graph = copy.deepcopy(graph)
         z += 1
-        if z % config["HIST_OUTPUT"] == 0:
-            print("step ", z)
-        print(z)
-        face = random.choice(faces)
+        for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
+            face = random.choice(faces)
+            ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
+            if random.random() > .5:
+                if not face in special_faces:
+                    special_faces.append(face)
+                else:
+                    special_faces.remove(face)
 
 
-        ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
-        if random.random() > .5:
-            if not face in special_faces:
-                special_faces.append(face)
-            else:
-                special_faces.remove(face)
+        face_sierpinski_mesh(itr_graph, special_faces)
 
-
-        face_sierpinski_mesh(graph, special_faces)
-
-        initial_partition = Partition(graph, assignment=config['ASSIGN_COL'], updaters=updaters)
+        initial_partition = Partition(itr_graph, assignment=config['ASSIGN_COL'], updaters=updaters)
 
 
         # Sets up Markov chain
@@ -267,18 +264,21 @@ def main():
             chain_output['dem_seat_data'].append(chain_output['dem_seat_data'][-1])
             chain_output['rep_seat_data'].append(chain_output['rep_seat_data'][-1])
             chain_output['score'].append(chain_output['score'][-1])
+    
+    
+    plt.plot(range(len(chain_output['score'])), chain_output['score'])
+    plt.xlabel("Chain Step")
+    plt.ylabel("Score")
+    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'score'+ '.png'
+    plt.savefig(plot_name)
+    plt.close()
+    plt.figure()
+    plt.plot(range(len(chain_output['rep_seat_data'])), chain_output['rep_seat_data'])
+    plt.xlabel("Chain Step")
+    plt.ylabel("rep_seat_data'")
+    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'rep_seat_data'+ '.png'
+    plt.savefig(plot_name)
 
-    mean_seats_data = [[]]
-    for i in range(0,(len(chain_output['rep_seat_data']) - config['HIST_OUTPUT']) + 1, config['HIST_OUTPUT']):
-        for election in chain_output['rep_seat_data'][i:i+config['HIST_OUTPUT']]:
-            mean_seats_data[-1].append((sum(election)/len(election)))
-        mean_seats_data.append([])
-    print(mean_seats_data)
-    fig = plt.figure(1, figsize=(9, 6))
-    ax = fig.add_subplot(111)
-    bp = ax.boxplot(mean_seats_data)
-    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'iteration_'+ str(z) + '.png'
-    fig.savefig(plot_name, bbox_inches='tight')
 if __name__ ==  '__main__':
     global config
     config = {
@@ -293,10 +293,10 @@ if __name__ ==  '__main__':
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'uniform',
         'GERRYCHAIN_STEPS' : 2,
-        'CHAIN_STEPS' : 30,
+        'CHAIN_STEPS' : 3000,
         'TEMPERATURE' : 1,
         "NUM_DISTRICTS": 12,
         'STATE_NAME': 'North Carolina',
-        'HIST_OUTPUT': 300
+        'PERCENT_FACES': .1
     }
     main()

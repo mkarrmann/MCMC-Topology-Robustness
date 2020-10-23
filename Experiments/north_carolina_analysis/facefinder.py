@@ -348,45 +348,6 @@ def compute_cross_edge(graph,partition):
         if Partition.crosses_parts(partition,n):
             cross_list.append(n)
     return cross_list
-def face_sierpinski_mesh(graph, special_faces):
-    #parameters: 
-    #graph: graph object that edges will be added to
-    #special_faces: list of faces that we want to add node/edges to
-    #TODO:k: integer depth parameter for depth of face refinement
-    max_label = max(list(graph.nodes()))
-    for face in special_faces:
-        graph.add_node(face)
-        neighbor_list = []
-        locations = []
-        connections = []
-        location = np.array([0,0]).astype("float64")
-        for v in face:
-            neighbor_list.append(v)
-            location += np.array(graph.nodes[v]["pos"]).astype("float64")
-        graph.nodes[face]["pos"] = location / len(face)
-        for w in face:
-            locations.append(graph.nodes[w]["pos"] - graph.nodes[face]["pos"])
-        angles = [float(np.arctan2(x[0], x[1])) for x in locations]
-        neighbor_list.sort(key=dict(zip(neighbor_list, angles)).get)
-        for v in range(0,len(neighbor_list)):
-            next_index = (v+1) % len(neighbor_list)
-            distance = np.array(graph.nodes[neighbor_list[v]]["pos"]) + np.array(graph.nodes[neighbor_list[next_index]]["pos"])
-            distance = distance * .5
-            label = max_label + 1
-            max_label += 1
-            graph.add_node(label)
-            graph.nodes[label]['pos'] = distance
-            remove_undirected_edge(graph, neighbor_list[v], neighbor_list[next_index])
-            graph.add_edge(neighbor_list[v],label)
-            graph.add_edge(label,neighbor_list[next_index])
-            connections.append(label)
-        for v in range(0,len(connections)):
-            if v+1 < len(connections):
-                graph.add_edge(connections[v],connections[v+1])
-            else:
-                graph.add_edge(connections[v],connections[0])
-        graph.remove_node(face)
-    return graph
 
 def remove_undirected_edge(graph, v, u):
     if (v,u) in graph.edges():
