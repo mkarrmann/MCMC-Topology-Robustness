@@ -3,6 +3,7 @@ import facefinder
 import numpy as np
 import pandas as pd
 import random
+import pickle
 import csv
 import copy
 import tqdm
@@ -269,16 +270,13 @@ def main():
     plt.plot(range(len(chain_output['score'])), chain_output['score'])
     plt.xlabel("Chain Step")
     plt.ylabel("Score")
-    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'score'+ '.png'
+    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'_'+config["CHAIN_STEPS"]+'_score'+ '.png'
     plt.savefig(plot_name)
-    plt.close()
-    plt.figure()
-    plt.plot(range(len(chain_output['rep_seat_data'])), chain_output['rep_seat_data'])
-    plt.xlabel("Chain Step")
-    plt.ylabel("rep_seat_data'")
-    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'rep_seat_data'+ '.png'
-    plt.savefig(plot_name)
+    save_obj(chain_output, config["STATE_NAME"]+config['CHAIN_STEPS'])
 
+def save_obj(obj, name ):
+    with open('obj/'+ name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 if __name__ ==  '__main__':
     global config
     config = {
@@ -292,11 +290,11 @@ if __name__ ==  '__main__':
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'uniform',
-        'GERRYCHAIN_STEPS' : 2,
-        'CHAIN_STEPS' : 3000,
+        'GERRYCHAIN_STEPS' : 200,
+        'CHAIN_STEPS' : 1000,
         'TEMPERATURE' : 1,
         "NUM_DISTRICTS": 12,
         'STATE_NAME': 'North Carolina',
-        'PERCENT_FACES': .1
+        'PERCENT_FACES': .05
     }
     main()
