@@ -137,6 +137,18 @@ def face_sierpinski_mesh(graph, special_faces):
         siblings = tuple(newEdges)
         for edge in newEdges:
             graph.edges[edge]['siblings'] = siblings
+def convex_proposal(graph):
+# Two proposal moves
+# 1) Delete an edge-- picks an edge uniformly at random, and checks if
+# the union of the two faces adjacent to it is convex. (
+# https://stackoverflow.com/a/45372025/6114885  ). If not, reject.
+# Otherwise, delete that edge.
+# 2) Pick a face at random, and two vertices in the face. Add an edge
+# between the two vertices (thought of as a straight line).
+    edges = list(graph.edges)
+    chosen_edge = random.choice(edges)
+    graph.remove_edge(chosen_edge[0], chosen_edge[1])
+
 
 def preprocessing(path_to_json):
     """Takes file path to JSON graph, and returns the appropriate
@@ -206,21 +218,25 @@ def main():
 
     z = 0
     for i in tqdm.tqdm(range(steps), ncols = 100, desc="Chain Progress"):
-        itr_graph = copy.deepcopy(graph)
+        special_faces_proposal = copy.deepcopy(special_faces)
+        proposal_graph = copy.deepcopy(graph)
         z += 1
-        for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
-            face = random.choice(faces)
-            ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
-            if random.random() > .5:
-                if not face in special_faces:
-                    special_faces.append(face)
-                else:
-                    special_faces.remove(face)
+        if (config["PROPOSAL_TYPE"] == "sierpinski"):
+            for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
+                face = random.choice(faces)
+                ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
+                if random.random() > .5:
+                    if not (face in special_faces_proposal):
+                        special_faces_proposal.append(face)
+                    else:
+                        special_faces_proposal.remove(face)
+            face_sierpinski_mesh(proposal_graph, special_faces_proposal)
+        elif(config["PROPOSAL_TYPE"] == "convex"):
+            convex_proposal(proposal_graph)
+        else:
+            raise RuntimeError('PROPOSAL TYPE must be "sierpinski" or "convex"')
 
-
-        face_sierpinski_mesh(itr_graph, special_faces)
-
-        initial_partition = Partition(itr_graph, assignment=config['ASSIGN_COL'], updaters=updaters)
+        initial_partition = Partition(proposal_graph, assignment=config['ASSIGN_COL'], updaters=updaters)
 
 
         # Sets up Markov chain
@@ -261,6 +277,7 @@ def main():
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
             chain_output['rep_seat_data'].append(seats_won_for_republicans)
             chain_output['score'].append(math.exp(statistics.mean(seats_won_for_republicans)))
+            special_faces = copy.deepcopy(special_faces_proposal)
         else:
             chain_output['dem_seat_data'].append(chain_output['dem_seat_data'][-1])
             chain_output['rep_seat_data'].append(chain_output['rep_seat_data'][-1])
@@ -290,11 +307,12 @@ if __name__ ==  '__main__':
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'uniform',
-        'GERRYCHAIN_STEPS' : 200,
-        'CHAIN_STEPS' : 1000,
+        'GERRYCHAIN_STEPS' : 50,
+        'CHAIN_STEPS' : 200,
         'TEMPERATURE' : 1,
         "NUM_DISTRICTS": 12,
         'STATE_NAME': 'North Carolina',
-        'PERCENT_FACES': .05
+        'PERCENT_FACES': .05,
+        'PROPOSAL_TYPE': "convex"
     }
     main()
