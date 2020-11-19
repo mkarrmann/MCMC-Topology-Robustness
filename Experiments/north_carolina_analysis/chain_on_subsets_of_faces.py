@@ -105,7 +105,14 @@ def face_sierpinski_mesh(graph, special_faces):
                 # and therefore both vertex and next_vertex will be of the same
                 # district.
                 graph.nodes[label][config['ASSIGN_COL']] = graph.nodes[vertex][config['ASSIGN_COL']]
-
+             # Choose a random adjacent node, assign the new node to the same partition,
+            # and move half of its votes and population to said node
+            elif config['SIERPINSKI_POP_STYLE'] == 'random':
+                chosenNode = random.choice([graph.nodes[vertex], graph.nodes[next_vertex]])
+                graph.nodes[label][config['ASSIGN_COL']] = chosenNode[config['ASSIGN_COL']]
+                for keyword in ['POP_COL', 'PARTY_A_COL', 'PARTY_B_COL']:
+                    graph.nodes[label][config[keyword]] += chosenNode[config[keyword]] // 2
+                    chosenNode[config[keyword]] -= chosenNode[config[keyword]] // 2
             # Set the population and votes of the new nodes to zero. Do not change
             # previously existing nodes. Assign to random neighbor.
             elif config['SIERPINSKI_POP_STYLE'] == 'zero':
@@ -147,6 +154,9 @@ def convex_proposal(graph):
 # between the two vertices (thought of as a straight line).
     edges = list(graph.edges)
     chosen_edge = random.choice(edges)
+   #need to find face that corresponds with edge 
+    faces = graph.graph["faces"]
+    faces = list(faces)
     graph.remove_edge(chosen_edge[0], chosen_edge[1])
 
 
@@ -182,7 +192,7 @@ def save_fig(graph, path, size):
         size (int): width of image
     """
     plt.figure()
-    nx.draw(graph, pos=nx.get_node_attributes(graph, 'pos'), node_size=1, width=size, cmap=plt.get_cmap('jet'))
+    nx.draw(graph, pos=nx.get_node_attributes(graph, 'pos'), node_size=1    , width=size, cmap=plt.get_cmap('jet'))
     # Gets format from end of filename
     plt.savefig(path, format=path.split('.')[-1])
     plt.close()
@@ -215,7 +225,7 @@ def main():
     #start with small score to move in right direction
     chain_output['score'].append(1/ 1100000)
     print("Choosing", math.floor(len(faces) * config['PERCENT_FACES']), "faces of the dual graph at each step")
-
+    max_score = -math.inf 
     z = 0
     for i in tqdm.tqdm(range(steps), ncols = 100, desc="Chain Progress"):
         special_faces_proposal = copy.deepcopy(special_faces)
@@ -269,6 +279,10 @@ def main():
 
         score = statistics.mean(seats_won_for_republicans)
 
+        #if score is highest seen, save map. 
+        if score > max_score:
+            nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"]), pickle.HIGHEST_PROTOCOL)
+            max_score = score
 
         ##This is the acceptance step of the Metropolis-Hasting's algorithm.
         if random.random() < min(1, (math.exp(score) / chain_output['score'][z - 1])**(1/temperature) ):
@@ -287,9 +301,9 @@ def main():
     plt.plot(range(len(chain_output['score'])), chain_output['score'])
     plt.xlabel("Chain Step")
     plt.ylabel("Score")
-    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'_'+config["CHAIN_STEPS"]+'_score'+ '.png'
+    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'_'+str(config["CHAIN_STEPS"])+'_score'+ '.png'
     plt.savefig(plot_name)
-    save_obj(chain_output, config["STATE_NAME"]+config['CHAIN_STEPS'])
+    save_obj(chain_output, config["STATE_NAME"]+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"]))
 
 def save_obj(obj, name ):
     with open('obj/'+ name + '.pkl', 'wb') as f:
@@ -306,13 +320,14 @@ if __name__ ==  '__main__':
         "WIDTH" : 1,
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
-        'SIERPINSKI_POP_STYLE': 'uniform',
-        'GERRYCHAIN_STEPS' : 50,
-        'CHAIN_STEPS' : 200,
+        'SIERPINSKI_POP_STYLE': 'random',
+        'GERRYCHAIN_STEPS' : 500,
+        'CHAIN_STEPS' : 10000,
         'TEMPERATURE' : 1,
         "NUM_DISTRICTS": 12,
         'STATE_NAME': 'North Carolina',
         'PERCENT_FACES': .05,
-        'PROPOSAL_TYPE': "convex"
+        'PROPOSAL_TYPE': "convex",
+        'epsilon': .01
     }
     main()
