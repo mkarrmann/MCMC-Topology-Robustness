@@ -1,4 +1,5 @@
 ## This script will perform a markov chain on the  subset faces of the north carolina graph, picking a face UAR and sierpinskifying or de-sierpinskifying it, then running gerrychain on the graph, recording central seat tendencies.
+# the output of the chain is stored in north_carolina/plots in a pickled object.
 import facefinder
 import numpy as np
 import pandas as pd
@@ -198,10 +199,15 @@ def save_fig(graph, path, size):
     plt.close()
 
 def main():
-    #gerrychain parameters
-    #num districts
+     """ Contains majority of expermiment. Runs a markov chain on the state dual graph, determining how the distribution is affected to changes in the 
+     state dual graph.
+     Raises:
+        RuntimeError if PROPOSAL_TYPE of config file is neither 'sierpinski'
+        nor 'convex'
+    """
+    #k is num districts
     k = config["NUM_DISTRICTS"]
-    epsilon = .05
+    epsilon = config["epsilon"]
     updaters = {'population': Tally('population'),
                             'cut_edges': cut_edges,
                             }
@@ -209,17 +215,16 @@ def main():
     ideal_population= sum( graph.nodes[x]["population"] for x in graph.nodes())/k
     faces = graph.graph["faces"]
     faces = list(faces)
-    #random.choice(faces) will return a random face
     totpop = 0
     for node in graph.nodes():
         totpop += int(graph.nodes[node]['population'])
-    # length of chain
+    #length of chain
     steps = config["CHAIN_STEPS"]
-
     temperature = config["TEMPERATURE"]
     #length of each gerrychain step
     gerrychain_steps = config["GERRYCHAIN_STEPS"]
-    #faces that are currently sierp
+    #faces that are currently modified. Code maintains list of modified faces, and at each step selects a face. if face is already in list, 
+    #the face is un-modified, and if it is not, the face is modified by the specified proposal type. 
     special_faces = []
     chain_output = { 'dem_seat_data': [], 'rep_seat_data':[], 'score':[] }
     #start with small score to move in right direction
@@ -227,12 +232,12 @@ def main():
     print("Choosing", math.floor(len(faces) * config['PERCENT_FACES']), "faces of the dual graph at each step")
     max_score = -math.inf 
     z = 0
+    #this is the main markov chain
     for i in tqdm.tqdm(range(steps), ncols = 100, desc="Chain Progress"):
         special_faces_proposal = copy.deepcopy(special_faces)
         proposal_graph = copy.deepcopy(graph)
         z += 1
-        if (config["PROPOSAL_TYPE"] == "sierpinski"):
-            for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
+        for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
                 face = random.choice(faces)
                 ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
                 if random.random() > .5:
@@ -240,9 +245,13 @@ def main():
                         special_faces_proposal.append(face)
                     else:
                         special_faces_proposal.remove(face)
+        if (config["PROPOSAL_TYPE"] == "sierpinski"):
             face_sierpinski_mesh(proposal_graph, special_faces_proposal)
+
         elif(config["PROPOSAL_TYPE"] == "convex"):
+            #TODO: complete convex proposal function
             convex_proposal(proposal_graph)
+
         else:
             raise RuntimeError('PROPOSAL TYPE must be "sierpinski" or "convex"')
 
@@ -252,7 +261,7 @@ def main():
         # Sets up Markov chain
         popbound = within_percent_of_ideal_population(initial_partition, epsilon)
         tree_proposal = partial(recom, pop_col=config['POP_COL'], pop_target=ideal_population, epsilon=epsilon,
-                                    node_repeats=1, method=facefinder.my_mst_bipartition_tree_random)
+                                    node_repeats=1)
 
 
         #make new function -- this computes the energy of the current map
@@ -284,10 +293,8 @@ def main():
             nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"]), pickle.HIGHEST_PROTOCOL)
             max_score = score
 
-        ##This is the acceptance step of the Metropolis-Hasting's algorithm.
+        ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
         if random.random() < min(1, (math.exp(score) / chain_output['score'][z - 1])**(1/temperature) ):
-             #if code acts weird, check if sign is wrong, unsure
-             #rand < min(1, P(x')/P(x))
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
             chain_output['rep_seat_data'].append(seats_won_for_republicans)
             chain_output['score'].append(math.exp(statistics.mean(seats_won_for_republicans)))
@@ -303,7 +310,7 @@ def main():
     plt.ylabel("Score")
     plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'_'+str(config["CHAIN_STEPS"])+'_score'+ '.png'
     plt.savefig(plot_name)
-    save_obj(chain_output, config["STATE_NAME"]+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"]))
+    save_obj(chain_output, config["STATE_NAME"]+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"])+str(config["TEMPERATURE"]))
 
 def save_obj(obj, name ):
     with open('obj/'+ name + '.pkl', 'wb') as f:
@@ -321,13 +328,13 @@ if __name__ ==  '__main__':
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'random',
-        'GERRYCHAIN_STEPS' : 500,
-        'CHAIN_STEPS' : 10000,
-        'TEMPERATURE' : 1,
+        'GERRYCHAIN_STEPS' : 25,
+        'CHAIN_STEPS' : 150,
+        'TEMPERATURE' : 100,
         "NUM_DISTRICTS": 12,
         'STATE_NAME': 'North Carolina',
-        'PERCENT_FACES': .05,
-        'PROPOSAL_TYPE': "convex",
+        'PERCENT_FACES': .5,
+        'PROPOSAL_TYPE': "sierpinski",
         'epsilon': .01
     }
     main()
