@@ -1,8 +1,10 @@
 ## This script will perform a markov chain on the  subset faces of the north carolina graph, picking a face UAR and sierpinskifying or de-sierpinskifying it, then running gerrychain on the graph, recording central seat tendencies.
+# the output of the chain is stored in north_carolina/plots in a pickled object.
 import facefinder
 import numpy as np
 import pandas as pd
 import random
+import pickle
 import csv
 import copy
 import tqdm
@@ -104,7 +106,14 @@ def face_sierpinski_mesh(graph, special_faces):
                 # and therefore both vertex and next_vertex will be of the same
                 # district.
                 graph.nodes[label][config['ASSIGN_COL']] = graph.nodes[vertex][config['ASSIGN_COL']]
-
+             # Choose a random adjacent node, assign the new node to the same partition,
+            # and move half of its votes and population to said node
+            elif config['SIERPINSKI_POP_STYLE'] == 'random':
+                chosenNode = random.choice([graph.nodes[vertex], graph.nodes[next_vertex]])
+                graph.nodes[label][config['ASSIGN_COL']] = chosenNode[config['ASSIGN_COL']]
+                for keyword in ['POP_COL', 'PARTY_A_COL', 'PARTY_B_COL']:
+                    graph.nodes[label][config[keyword]] += chosenNode[config[keyword]] // 2
+                    chosenNode[config[keyword]] -= chosenNode[config[keyword]] // 2
             # Set the population and votes of the new nodes to zero. Do not change
             # previously existing nodes. Assign to random neighbor.
             elif config['SIERPINSKI_POP_STYLE'] == 'zero':
@@ -136,6 +145,21 @@ def face_sierpinski_mesh(graph, special_faces):
         siblings = tuple(newEdges)
         for edge in newEdges:
             graph.edges[edge]['siblings'] = siblings
+def convex_proposal(graph):
+# Two proposal moves
+# 1) Delete an edge-- picks an edge uniformly at random, and checks if
+# the union of the two faces adjacent to it is convex. (
+# https://stackoverflow.com/a/45372025/6114885  ). If not, reject.
+# Otherwise, delete that edge.
+# 2) Pick a face at random, and two vertices in the face. Add an edge
+# between the two vertices (thought of as a straight line).
+    edges = list(graph.edges)
+    chosen_edge = random.choice(edges)
+   #need to find face that corresponds with edge 
+    faces = graph.graph["faces"]
+    faces = list(faces)
+    graph.remove_edge(chosen_edge[0], chosen_edge[1])
+
 
 def preprocessing(path_to_json):
     """Takes file path to JSON graph, and returns the appropriate
@@ -169,16 +193,21 @@ def save_fig(graph, path, size):
         size (int): width of image
     """
     plt.figure()
-    nx.draw(graph, pos=nx.get_node_attributes(graph, 'pos'), node_size=1, width=size, cmap=plt.get_cmap('jet'))
+    nx.draw(graph, pos=nx.get_node_attributes(graph, 'pos'), node_size=1    , width=size, cmap=plt.get_cmap('jet'))
     # Gets format from end of filename
     plt.savefig(path, format=path.split('.')[-1])
     plt.close()
 
 def main():
-    #gerrychain parameters
-    #num districts
+     """ Contains majority of expermiment. Runs a markov chain on the state dual graph, determining how the distribution is affected to changes in the 
+     state dual graph.
+     Raises:
+        RuntimeError if PROPOSAL_TYPE of config file is neither 'sierpinski'
+        nor 'convex'
+    """
+    #k is num districts
     k = config["NUM_DISTRICTS"]
-    epsilon = .05
+    epsilon = config["epsilon"]
     updaters = {'population': Tally('population'),
                             'cut_edges': cut_edges,
                             }
@@ -186,46 +215,53 @@ def main():
     ideal_population= sum( graph.nodes[x]["population"] for x in graph.nodes())/k
     faces = graph.graph["faces"]
     faces = list(faces)
-    #random.choice(faces) will return a random face
     totpop = 0
     for node in graph.nodes():
         totpop += int(graph.nodes[node]['population'])
-    # length of chain
+    #length of chain
     steps = config["CHAIN_STEPS"]
-
     temperature = config["TEMPERATURE"]
     #length of each gerrychain step
     gerrychain_steps = config["GERRYCHAIN_STEPS"]
-    #faces that are currently sierp
+    #faces that are currently modified. Code maintains list of modified faces, and at each step selects a face. if face is already in list, 
+    #the face is un-modified, and if it is not, the face is modified by the specified proposal type. 
     special_faces = []
     chain_output = { 'dem_seat_data': [], 'rep_seat_data':[], 'score':[] }
     #start with small score to move in right direction
     chain_output['score'].append(1/ 1100000)
     print("Choosing", math.floor(len(faces) * config['PERCENT_FACES']), "faces of the dual graph at each step")
-
+    max_score = -math.inf 
     z = 0
+    #this is the main markov chain
     for i in tqdm.tqdm(range(steps), ncols = 100, desc="Chain Progress"):
-        itr_graph = copy.deepcopy(graph)
+        special_faces_proposal = copy.deepcopy(special_faces)
+        proposal_graph = copy.deepcopy(graph)
         z += 1
         for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
-            face = random.choice(faces)
-            ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
-            if random.random() > .5:
-                if not face in special_faces:
-                    special_faces.append(face)
-                else:
-                    special_faces.remove(face)
+                face = random.choice(faces)
+                ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
+                if random.random() > .5:
+                    if not (face in special_faces_proposal):
+                        special_faces_proposal.append(face)
+                    else:
+                        special_faces_proposal.remove(face)
+        if (config["PROPOSAL_TYPE"] == "sierpinski"):
+            face_sierpinski_mesh(proposal_graph, special_faces_proposal)
 
+        elif(config["PROPOSAL_TYPE"] == "convex"):
+            #TODO: complete convex proposal function
+            convex_proposal(proposal_graph)
 
-        face_sierpinski_mesh(itr_graph, special_faces)
+        else:
+            raise RuntimeError('PROPOSAL TYPE must be "sierpinski" or "convex"')
 
-        initial_partition = Partition(itr_graph, assignment=config['ASSIGN_COL'], updaters=updaters)
+        initial_partition = Partition(proposal_graph, assignment=config['ASSIGN_COL'], updaters=updaters)
 
 
         # Sets up Markov chain
         popbound = within_percent_of_ideal_population(initial_partition, epsilon)
         tree_proposal = partial(recom, pop_col=config['POP_COL'], pop_target=ideal_population, epsilon=epsilon,
-                                    node_repeats=1, method=facefinder.my_mst_bipartition_tree_random)
+                                    node_repeats=1)
 
 
         #make new function -- this computes the energy of the current map
@@ -252,14 +288,17 @@ def main():
 
         score = statistics.mean(seats_won_for_republicans)
 
+        #if score is highest seen, save map. 
+        if score > max_score:
+            nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"]), pickle.HIGHEST_PROTOCOL)
+            max_score = score
 
-        ##This is the acceptance step of the Metropolis-Hasting's algorithm.
+        ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
         if random.random() < min(1, (math.exp(score) / chain_output['score'][z - 1])**(1/temperature) ):
-             #if code acts weird, check if sign is wrong, unsure
-             #rand < min(1, P(x')/P(x))
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
             chain_output['rep_seat_data'].append(seats_won_for_republicans)
             chain_output['score'].append(math.exp(statistics.mean(seats_won_for_republicans)))
+            special_faces = copy.deepcopy(special_faces_proposal)
         else:
             chain_output['dem_seat_data'].append(chain_output['dem_seat_data'][-1])
             chain_output['rep_seat_data'].append(chain_output['rep_seat_data'][-1])
@@ -269,16 +308,13 @@ def main():
     plt.plot(range(len(chain_output['score'])), chain_output['score'])
     plt.xlabel("Chain Step")
     plt.ylabel("Score")
-    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'score'+ '.png'
+    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'_'+str(config["CHAIN_STEPS"])+'_score'+ '.png'
     plt.savefig(plot_name)
-    plt.close()
-    plt.figure()
-    plt.plot(range(len(chain_output['rep_seat_data'])), chain_output['rep_seat_data'])
-    plt.xlabel("Chain Step")
-    plt.ylabel("rep_seat_data'")
-    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'rep_seat_data'+ '.png'
-    plt.savefig(plot_name)
+    save_obj(chain_output, config["STATE_NAME"]+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"])+str(config["TEMPERATURE"]))
 
+def save_obj(obj, name ):
+    with open('obj/'+ name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 if __name__ ==  '__main__':
     global config
     config = {
@@ -291,12 +327,14 @@ if __name__ ==  '__main__':
         "WIDTH" : 1,
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
-        'SIERPINSKI_POP_STYLE': 'uniform',
-        'GERRYCHAIN_STEPS' : 2,
-        'CHAIN_STEPS' : 3000,
-        'TEMPERATURE' : 1,
+        'SIERPINSKI_POP_STYLE': 'random',
+        'GERRYCHAIN_STEPS' : 25,
+        'CHAIN_STEPS' : 150,
+        'TEMPERATURE' : 100,
         "NUM_DISTRICTS": 12,
         'STATE_NAME': 'North Carolina',
-        'PERCENT_FACES': .1
+        'PERCENT_FACES': .5,
+        'PROPOSAL_TYPE': "sierpinski",
+        'epsilon': .01
     }
     main()
