@@ -1,2 +1,1 @@
-What's here:
-
+This directory contains a markov chain on the state dual graph of north carolina. This markov chain is defined in the file "north_carolina_analysis/chain_on_subset_of_faces.py". The markov chain currently makes a proposal at each step to Sierpinskify a percentage of the faces of the dual graph. Gerrychain is then run on this modified dual graph to determine the seat distribution of this map. 
