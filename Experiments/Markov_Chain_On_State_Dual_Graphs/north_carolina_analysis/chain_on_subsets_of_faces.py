@@ -145,21 +145,17 @@ def face_sierpinski_mesh(graph, special_faces):
         siblings = tuple(newEdges)
         for edge in newEdges:
             graph.edges[edge]['siblings'] = siblings
-def convex_proposal(graph):
-# Two proposal moves
-# 1) Delete an edge-- picks an edge uniformly at random, and checks if
-# the union of the two faces adjacent to it is convex. (
-# https://stackoverflow.com/a/45372025/6114885  ). If not, reject.
-# Otherwise, delete that edge.
-# 2) Pick a face at random, and two vertices in the face. Add an edge
-# between the two vertices (thought of as a straight line).
-    edges = list(graph.edges)
-    chosen_edge = random.choice(edges)
-   #need to find face that corresponds with edge 
-    faces = graph.graph["faces"]
-    faces = list(faces)
-    graph.remove_edge(chosen_edge[0], chosen_edge[1])
+def add_edge_proposal(graph, special_faces):
+"""Takes set of 4 edge faces, and adds an edge.
 
+    Args:
+        graph (Gerrychain Graph): graph in JSON file following cleaning
+        special_faces (List): list of four sided faces
+    """
+  neighbors = []
+  for face in special_faces:
+    for vertex in face:
+        
 
 def preprocessing(path_to_json):
     """Takes file path to JSON graph, and returns the appropriate
