@@ -152,9 +152,13 @@ def add_edge_proposal(graph, special_faces):
         graph (Gerrychain Graph): graph in JSON file following cleaning
         special_faces (List): list of four sided faces
     """
-  neighbors = []
-  for face in special_faces:
-    for vertex in face:
+    for face in special_faces:
+        neighbors = []
+        for vertex in face:
+            neighbors.append(vertex)
+        for vertex, next_vertex in zip(neighbors, neighbors[1:] + [neighbors[0]]):
+            if (not graph.has_edge(vertex, next_vertex)) and (not graph.has_edge(next_vertex, vertex)):
+                print("no edge: " vertex, next_vertex)
         
 
 def preprocessing(path_to_json):
@@ -244,9 +248,9 @@ def main():
         if (config["PROPOSAL_TYPE"] == "sierpinski"):
             face_sierpinski_mesh(proposal_graph, special_faces_proposal)
 
-        elif(config["PROPOSAL_TYPE"] == "convex"):
+        elif(config["PROPOSAL_TYPE"] == "add_edge"):
             #TODO: complete convex proposal function
-            convex_proposal(proposal_graph)
+            add_edge_proposal(proposal_graph, special_faces_proposal)
 
         else:
             raise RuntimeError('PROPOSAL TYPE must be "sierpinski" or "convex"')
@@ -327,10 +331,10 @@ if __name__ ==  '__main__':
         'GERRYCHAIN_STEPS' : 25,
         'CHAIN_STEPS' : 150,
         'TEMPERATURE' : 100,
-        "NUM_DISTRICTS": 12,
+        "NUM_DISTRICTS": 13,
         'STATE_NAME': 'North Carolina',
         'PERCENT_FACES': .5,
-        'PROPOSAL_TYPE': "sierpinski",
+        'PROPOSAL_TYPE': "add_edge",
         'epsilon': .01
     }
     main()
