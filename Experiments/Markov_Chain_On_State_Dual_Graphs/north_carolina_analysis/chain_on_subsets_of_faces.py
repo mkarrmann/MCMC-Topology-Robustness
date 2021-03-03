@@ -146,7 +146,7 @@ def face_sierpinski_mesh(graph, special_faces):
         for edge in newEdges:
             graph.edges[edge]['siblings'] = siblings
 def add_edge_proposal(graph, special_faces):
-"""Takes set of 4 edge faces, and adds an edge.
+    """Takes set of 4 edge faces, and adds an edge.
 
     Args:
         graph (Gerrychain Graph): graph in JSON file following cleaning
@@ -158,7 +158,7 @@ def add_edge_proposal(graph, special_faces):
             neighbors.append(vertex)
         for vertex, next_vertex in zip(neighbors, neighbors[1:] + [neighbors[0]]):
             if (not graph.has_edge(vertex, next_vertex)) and (not graph.has_edge(next_vertex, vertex)):
-                print("no edge: " vertex, next_vertex)
+                print("no edge: ", vertex, next_vertex)
         
 
 def preprocessing(path_to_json):
@@ -237,7 +237,9 @@ def main():
         special_faces_proposal = copy.deepcopy(special_faces)
         proposal_graph = copy.deepcopy(graph)
         z += 1
-        for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
+        square_faces = [face for face in faces if len(face) == 4]
+        if (config["PROPOSAL_TYPE"] == "sierpinski"):
+            for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
                 face = random.choice(faces)
                 ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
                 if random.random() > .5:
@@ -245,11 +247,16 @@ def main():
                         special_faces_proposal.append(face)
                     else:
                         special_faces_proposal.remove(face)
-        if (config["PROPOSAL_TYPE"] == "sierpinski"):
             face_sierpinski_mesh(proposal_graph, special_faces_proposal)
-
         elif(config["PROPOSAL_TYPE"] == "add_edge"):
-            #TODO: complete convex proposal function
+            for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
+                face = random.choice(square_faces)
+                ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
+                if random.random() > .5:
+                    if not (face in special_faces_proposal):
+                        special_faces_proposal.append(face)
+                    else:
+                        special_faces_proposal.remove(face)
             add_edge_proposal(proposal_graph, special_faces_proposal)
 
         else:
@@ -332,7 +339,7 @@ if __name__ ==  '__main__':
         'CHAIN_STEPS' : 150,
         'TEMPERATURE' : 100,
         "NUM_DISTRICTS": 13,
-        'STATE_NAME': 'North Carolina',
+        'STATE_NAME': 'north_carolina',
         'PERCENT_FACES': .5,
         'PROPOSAL_TYPE': "add_edge",
         'epsilon': .01
