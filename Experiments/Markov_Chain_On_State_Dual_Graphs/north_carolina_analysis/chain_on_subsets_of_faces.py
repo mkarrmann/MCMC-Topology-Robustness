@@ -259,7 +259,7 @@ def main():
                     if not (face in special_faces_proposal):
                         special_faces_proposal.add(face)
                     else:
-                        special_faces_proposal.delete(face)
+                        special_faces_proposal.remove(face)
             add_edge_proposal(proposal_graph, special_faces_proposal)
         else:
             raise RuntimeError('PROPOSAL TYPE must be "sierpinski" or "convex"')
