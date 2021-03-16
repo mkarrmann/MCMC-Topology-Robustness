@@ -223,7 +223,7 @@ def main():
     #length of each gerrychain step
     gerrychain_steps = config["GERRYCHAIN_STEPS"]
     #faces that are currently modified. Code maintains list of modified faces, and at each step selects a face. if face is already in list, 
-    #the face is un-modified, and if it is not, the face is modified by the specified proposal type. 
+    #the face is un-modified, and if it is not, the face is modified by the specified proposal type.
     special_faces = set( [ face for face in square_faces if np.random.uniform(0,1) < .5 ] )
     chain_output = { 'dem_seat_data': [], 'rep_seat_data':[], 'score':[] }
     #start with small score to move in right direction
