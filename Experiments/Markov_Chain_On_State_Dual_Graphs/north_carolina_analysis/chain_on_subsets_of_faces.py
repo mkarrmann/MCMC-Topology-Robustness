@@ -213,17 +213,18 @@ def main():
     ideal_population= sum( graph.nodes[x]["population"] for x in graph.nodes())/k
     faces = graph.graph["faces"]
     faces = list(faces)
+    square_faces = [face for face in faces if len(face) == 4]
     totpop = 0
     for node in graph.nodes():
         totpop += int(graph.nodes[node]['population'])
     #length of chain
     steps = config["CHAIN_STEPS"]
-    temperature = config["TEMPERATURE"]
+    
     #length of each gerrychain step
     gerrychain_steps = config["GERRYCHAIN_STEPS"]
     #faces that are currently modified. Code maintains list of modified faces, and at each step selects a face. if face is already in list, 
     #the face is un-modified, and if it is not, the face is modified by the specified proposal type. 
-    special_faces = []
+    special_faces = set( [ face for face in square_faces if np.random.uniform(0,1) < .5 ] )
     chain_output = { 'dem_seat_data': [], 'rep_seat_data':[], 'score':[] }
     #start with small score to move in right direction
     chain_output['score'].append(1/ 1100000)
@@ -232,10 +233,14 @@ def main():
     z = 0
     #this is the main markov chain
     for i in tqdm.tqdm(range(steps), ncols = 100, desc="Chain Progress"):
+        #implement mattingly simulated annealing scheme, from evaluating partisan gerrymandering in wisconsin
+        if z <= math.floor(steps * .67):
+            beta = steps / math.floor(steps * .67)
+        else:
+            beta = 1
         special_faces_proposal = copy.deepcopy(special_faces)
         proposal_graph = copy.deepcopy(graph)
         z += 1
-        square_faces = [face for face in faces if len(face) == 4]
         if (config["PROPOSAL_TYPE"] == "sierpinski"):
             for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
                 face = random.choice(faces)
@@ -252,11 +257,10 @@ def main():
                 ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
                 if random.random() > .5:
                     if not (face in special_faces_proposal):
-                        special_faces_proposal.append(face)
+                        special_faces_proposal.add(face)
                     else:
-                        special_faces_proposal.remove(face)
+                        special_faces_proposal.delete(face)
             add_edge_proposal(proposal_graph, special_faces_proposal)
-            facefinder.save_fig(proposal_graph,"./plots/edge_proposal_test.png",1)
         else:
             raise RuntimeError('PROPOSAL TYPE must be "sierpinski" or "convex"')
 
@@ -297,9 +301,9 @@ def main():
         if score > max_score:
             nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"]), pickle.HIGHEST_PROTOCOL)
             max_score = score
-
+        temperature = -1 / beta
         ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
-        if random.random() < min(1, (math.exp(score) / chain_output['score'][z - 1])**(1/temperature) ):
+        if random.random() < min(1, (math.exp(score) / math.exp(chain_output['score'][z - 1]))**(1/temperature) ):
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
             chain_output['rep_seat_data'].append(seats_won_for_republicans)
             chain_output['score'].append(math.exp(statistics.mean(seats_won_for_republicans)))
@@ -334,8 +338,7 @@ if __name__ ==  '__main__':
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'random',
         'GERRYCHAIN_STEPS' : 25,
-        'CHAIN_STEPS' : 150,
-        'TEMPERATURE' : 100,
+        'CHAIN_STEPS' : 1000,
         "NUM_DISTRICTS": 13,
         'STATE_NAME': 'north_carolina',
         'PERCENT_FACES': .05,
