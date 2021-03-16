@@ -179,6 +179,7 @@ def metamander_around_partition(graph, dual, target_partition, tag,num_dist):
         if 'EL16G_PR_R' not in g_sierpinsky.nodes[node]:
             g_sierpinsky.nodes[node]['EL16G_PR_R'] = 0
         ##Need to add the voting data
+        # Seanna: So it looks like it initialize population and voting data to 0 when create a new node? Is that matter?
     print("assigning districts to metamander")
     total_pop = sum( [ g_sierpinsky.nodes[node]['population'] for node in g_sierpinsky])
     cddict = recursive_tree_part(graph,range(num_dist),total_pop/num_dist,"population", .01,1)

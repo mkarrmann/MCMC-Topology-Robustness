@@ -342,4 +342,5 @@ if __name__ ==  '__main__':
         'PROPOSAL_TYPE': "add_edge",
         'epsilon': .01
     }
+    # Seanna: so in here the number of districts is 12 (maybe we want to revise it?)
     main()
