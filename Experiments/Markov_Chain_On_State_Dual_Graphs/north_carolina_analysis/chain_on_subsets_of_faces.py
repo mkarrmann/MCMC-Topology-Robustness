@@ -303,7 +303,7 @@ def main():
             max_score = score
         temperature = -1 / beta
         ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
-        if random.random() < min(1, (math.exp(score) / math.exp(chain_output['score'][z - 1]))**(1/temperature) ):
+        if np.random.uniform(0,1) < min(1, (math.exp(score) / math.exp(chain_output['score'][z - 1]))**(1/temperature) ):
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
             chain_output['rep_seat_data'].append(seats_won_for_republicans)
             chain_output['score'].append(math.exp(statistics.mean(seats_won_for_republicans)))
