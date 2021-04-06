@@ -227,20 +227,12 @@ def main():
     special_faces = set( [ face for face in square_faces if np.random.uniform(0,1) < .5 ] )
     chain_output = { 'dem_seat_data': [], 'rep_seat_data':[], 'score':[] }
     #start with small score to move in right direction
-    chain_output['score'].append(1/ 1100000)
     print("Choosing", math.floor(len(faces) * config['PERCENT_FACES']), "faces of the dual graph at each step")
     max_score = -math.inf 
-    z = 0
     #this is the main markov chain
-    for i in tqdm.tqdm(range(steps), ncols = 100, desc="Chain Progress"):
-        #implement mattingly simulated annealing scheme, from evaluating partisan gerrymandering in wisconsin
-        if z <= math.floor(steps * .67):
-            beta = steps / math.floor(steps * .67)
-        else:
-            beta = 1
+    for i in tqdm.tqdm(range(1,steps+1), ncols = 100, desc="Chain Progress"):
         special_faces_proposal = copy.deepcopy(special_faces)
         proposal_graph = copy.deepcopy(graph)
-        z += 1
         if (config["PROPOSAL_TYPE"] == "sierpinski"):
             for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
                 face = random.choice(faces)
@@ -252,7 +244,7 @@ def main():
                         special_faces_proposal.remove(face)
             face_sierpinski_mesh(proposal_graph, special_faces_proposal)
         elif(config["PROPOSAL_TYPE"] == "add_edge"):
-            for i in range(math.floor(len(square_faces) * config['PERCENT_FACES'])):
+            for j in range(math.floor(len(square_faces) * config['PERCENT_FACES'])):
                 face = random.choice(square_faces)
                 ##Makes the Markov chain lazy -- this just makes the chain aperiodic.
                 if random.random() > .5:
@@ -281,11 +273,11 @@ def main():
         for part in exp_chain:
             rep_seats_won = 0
             dem_seats_won = 0
-            for i in range(k):
+            for j in range(k):
                 rep_votes = 0
                 dem_votes = 0
                 for n in graph.nodes():
-                    if part.assignment[n] == i:
+                    if part.assignment[n] == j:
                         rep_votes += graph.nodes[n]["EL16G_PR_R"]
                         dem_votes += graph.nodes[n]["EL16G_PR_D"]
                 total_seats_dem = int(dem_votes > rep_votes)
@@ -296,30 +288,43 @@ def main():
             seats_won_for_democrats.append(dem_seats_won)
 
         score = statistics.mean(seats_won_for_republicans)
-
-        #if score is highest seen, save map. 
-        if score > max_score:
-            nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"]), pickle.HIGHEST_PROTOCOL)
-            max_score = score
-        temperature = -1 / beta
+        #implement mattingly simulated annealing scheme, from evaluating partisan gerrymandering in wisconsin
+        if i <= math.floor(steps * .67):
+            beta = i / math.floor(steps * .67)
+        else:
+            beta = 1
+        temperature = 1 / (100 * beta)
         ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
-        if np.random.uniform(0,1) < min(1, (math.exp(score) / math.exp(chain_output['score'][z - 1]))**(1/temperature) ):
+        #if the acceptance criteria is met or if it is the first step of the chain
+        if i == 1:
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
             chain_output['rep_seat_data'].append(seats_won_for_republicans)
-            chain_output['score'].append(math.exp(statistics.mean(seats_won_for_republicans)))
+            chain_output['score'].append(score)
+            special_faces = copy.deepcopy(special_faces_proposal)
+        #this is the simplified form of the acceptance criteria, for intuitive purposes
+        #exp((1/temperature) ( proposal_score - previous_score)) 
+        elif np.random.uniform(0,1) < (math.exp(score) / math.exp(chain_output['score'][-1]))**(1/temperature):
+            chain_output['dem_seat_data'].append(seats_won_for_democrats)
+            chain_output['rep_seat_data'].append(seats_won_for_republicans)
+            chain_output['score'].append(score)
             special_faces = copy.deepcopy(special_faces_proposal)
         else:
             chain_output['dem_seat_data'].append(chain_output['dem_seat_data'][-1])
             chain_output['rep_seat_data'].append(chain_output['rep_seat_data'][-1])
             chain_output['score'].append(chain_output['score'][-1])
+        #if score is highest seen, save map. 
+        if score > max_score:
+            #todo: all graph coloring for graph changes that produced this score
+            nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+str(config['CHAIN_STEPS'])+'mcs,'+ str(config["GERRYCHAIN_STEPS"])+ "gcs" + config['PROPOSAL_TYPE'], pickle.HIGHEST_PROTOCOL)
+            max_score = score
     
     
     plt.plot(range(len(chain_output['score'])), chain_output['score'])
-    plt.xlabel("Chain Step")
+    plt.xlabel("Meta-Chain Step")
     plt.ylabel("Score")
-    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'_'+str(config["CHAIN_STEPS"])+'_score'+ '.png'
+    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'_'+str(config["CHAIN_STEPS"])+ config['PROPOSAL_TYPE']+'_score'+ '.png'
     plt.savefig(plot_name)
-    save_obj(chain_output, config["STATE_NAME"]+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"])+str(config["TEMPERATURE"]))
+    save_obj(chain_output, config["STATE_NAME"]+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"])+str(config["PROPOSAL_TYPE"]))
 
 def save_obj(obj, name ):
     with open('obj/'+ name + '.pkl', 'wb') as f:
@@ -338,7 +343,7 @@ if __name__ ==  '__main__':
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'random',
         'GERRYCHAIN_STEPS' : 25,
-        'CHAIN_STEPS' : 1000,
+        'CHAIN_STEPS' : 50,
         "NUM_DISTRICTS": 13,
         'STATE_NAME': 'north_carolina',
         'PERCENT_FACES': .05,
