@@ -292,8 +292,8 @@ def main():
         if i <= math.floor(steps * .67):
             beta = i / math.floor(steps * .67)
         else:
-            beta = 1
-        temperature = 1 / (100 * beta)
+            beta = (i / math.floor(steps * .67)) * 100
+        temperature = 1 / (beta)
         ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
         #if the acceptance criteria is met or if it is the first step of the chain
         if i == 1:
@@ -315,7 +315,8 @@ def main():
         #if score is highest seen, save map. 
         if score > max_score:
             #todo: all graph coloring for graph changes that produced this score
-            nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+str(config['CHAIN_STEPS'])+'mcs,'+ str(config["GERRYCHAIN_STEPS"])+ "gcs" + config['PROPOSAL_TYPE'], pickle.HIGHEST_PROTOCOL)
+            nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+'sc_'+str(config['CHAIN_STEPS'])+'mcs_'+ str(config["GERRYCHAIN_STEPS"])+ "gcs_" + 
+                config['PROPOSAL_TYPE']+'_'+ str(len(special_faces)), pickle.HIGHEST_PROTOCOL)
             max_score = score
     
     
@@ -342,8 +343,8 @@ if __name__ ==  '__main__':
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'random',
-        'GERRYCHAIN_STEPS' : 25,
-        'CHAIN_STEPS' : 50,
+        'GERRYCHAIN_STEPS' : 150,
+        'CHAIN_STEPS' : 500,
         "NUM_DISTRICTS": 13,
         'STATE_NAME': 'north_carolina',
         'PERCENT_FACES': .05,
