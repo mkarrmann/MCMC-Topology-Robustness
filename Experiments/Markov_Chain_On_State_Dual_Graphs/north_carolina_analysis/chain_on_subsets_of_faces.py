@@ -12,7 +12,7 @@ import statistics
 import math
 import gerrychain
 import networkx
-import matplotlib as mpl 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import networkx as nx
 from functools import partial
@@ -158,7 +158,7 @@ def add_edge_proposal(graph, special_faces):
                 if ((not graph.has_edge(vertex, itr_vertex)) and (not graph.has_edge(itr_vertex, vertex)) and vertex != vertex):
                     graph.add_edge(vertex, itr_vertex)
                     break
-        
+
 
 def preprocessing(path_to_json):
     """Takes file path to JSON graph, and returns the appropriate
@@ -198,7 +198,7 @@ def save_fig(graph, path, size):
     plt.close()
 
 def main():
-    """ Contains majority of expermiment. Runs a markov chain on the state dual graph, determining how the distribution is affected to changes in the 
+    """ Contains majority of expermiment. Runs a markov chain on the state dual graph, determining how the distribution is affected to changes in the
      state dual graph.
      Raises:
         RuntimeError if PROPOSAL_TYPE of config file is neither 'sierpinski'
@@ -219,16 +219,16 @@ def main():
         totpop += int(graph.nodes[node]['population'])
     #length of chain
     steps = config["CHAIN_STEPS"]
-    
+
     #length of each gerrychain step
     gerrychain_steps = config["GERRYCHAIN_STEPS"]
-    #faces that are currently modified. Code maintains list of modified faces, and at each step selects a face. if face is already in list, 
+    #faces that are currently modified. Code maintains list of modified faces, and at each step selects a face. if face is already in list,
     #the face is un-modified, and if it is not, the face is modified by the specified proposal type.
     special_faces = set( [ face for face in square_faces if np.random.uniform(0,1) < .5 ] )
-    chain_output = { 'dem_seat_data': [], 'rep_seat_data':[], 'score':[] }
+    chain_output = { 'dem_seat_data': [], 'rep_seat_data':[], 'score':[], 'seat_score' : [], 'flip_score' : [] }
     #start with small score to move in right direction
     print("Choosing", math.floor(len(faces) * config['PERCENT_FACES']), "faces of the dual graph at each step")
-    max_score = -math.inf 
+    max_score = -math.inf
     #this is the main markov chain
     for i in tqdm.tqdm(range(1,steps+1), ncols = 100, desc="Chain Progress"):
         special_faces_proposal = copy.deepcopy(special_faces)
@@ -287,44 +287,84 @@ def main():
             seats_won_for_republicans.append(rep_seats_won)
             seats_won_for_democrats.append(dem_seats_won)
 
-        score = statistics.mean(seats_won_for_republicans)
-        #implement mattingly simulated annealing scheme, from evaluating partisan gerrymandering in wisconsin
+        seat_score  = statistics.mean(seats_won_for_republicans)
+        ##
+
+        flips_score = len(special_faces) # This is the number of edges being swapped
+
+        score = weight_seats * seats_score + weight_flips * flips_score
+
+        #implement modified mattingly simulated annealing scheme, from evaluating partisan gerrymandering in wisconsin
         if i <= math.floor(steps * .67):
             beta = i / math.floor(steps * .67)
         else:
             beta = (i / math.floor(steps * .67)) * 100
         temperature = 1 / (beta)
+
+
+        weight_seats = 1
+        weight_flips = -.2
+        config['PERCENT_FACES'] = config['PERCENT_FACES']
+
         ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
         #if the acceptance criteria is met or if it is the first step of the chain
-        if i == 1:
+        def update_outputs():
+
+            # Todo: Check that the scope stuff works here
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
             chain_output['rep_seat_data'].append(seats_won_for_republicans)
             chain_output['score'].append(score)
+            chain_output['seat_score'].append(seat_score)
+            chain_output['flip_score'].append(flip_score)
+
+        def propagate_outputs():
+            # Todo: Check that the scope stuff works here
+            for key in chain_output.keys():
+                chain_output[key].append(chain_output['key'][-1])
+
+            #chain_output['dem_seat_data'].append(chain_output['dem_seat_data'][-1])
+            #chain_output['rep_seat_data'].append(chain_output['rep_seat_data'][-1])
+            #chain_output['score'].append(chain_output['score'][-1])
+
+
+        if i == 1:
+            update_outputs()
+
+            #chain_output['dem_seat_data'].append(seats_won_for_democrats)
+            #chain_output['rep_seat_data'].append(seats_won_for_republicans)
+            #chain_output['score'].append(score)
             special_faces = copy.deepcopy(special_faces_proposal)
         #this is the simplified form of the acceptance criteria, for intuitive purposes
-        #exp((1/temperature) ( proposal_score - previous_score)) 
+        #exp((1/temperature) ( proposal_score - previous_score))
         elif np.random.uniform(0,1) < (math.exp(score) / math.exp(chain_output['score'][-1]))**(1/temperature):
-            chain_output['dem_seat_data'].append(seats_won_for_democrats)
-            chain_output['rep_seat_data'].append(seats_won_for_republicans)
-            chain_output['score'].append(score)
+            update_outputs()
+            #chain_output['dem_seat_data'].append(seats_won_for_democrats)
+            #chain_output['rep_seat_data'].append(seats_won_for_republicans)
+            #chain_output['score'].append(score)
+            #chain_output['seat_score'].append(seat_score)
+            #chain_output['flip_score'].append(flip_score)
+
             special_faces = copy.deepcopy(special_faces_proposal)
         else:
-            chain_output['dem_seat_data'].append(chain_output['dem_seat_data'][-1])
-            chain_output['rep_seat_data'].append(chain_output['rep_seat_data'][-1])
-            chain_output['score'].append(chain_output['score'][-1])
-        #if score is highest seen, save map. 
+            propagate_outputs()
+
+        #if score is highest seen, save map.
         if score > max_score:
             #todo: all graph coloring for graph changes that produced this score
-            nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+'sc_'+str(config['CHAIN_STEPS'])+'mcs_'+ str(config["GERRYCHAIN_STEPS"])+ "gcs_" + 
+            nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+'sc_'+str(config['CHAIN_STEPS'])+'mcs_'+ str(config["GERRYCHAIN_STEPS"])+ "gcs_" +
                 config['PROPOSAL_TYPE']+'_'+ str(len(special_faces)), pickle.HIGHEST_PROTOCOL)
             max_score = score
-    
-    
+
+
     plt.plot(range(len(chain_output['score'])), chain_output['score'])
     plt.xlabel("Meta-Chain Step")
     plt.ylabel("Score")
     plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'_'+str(config["CHAIN_STEPS"])+ config['PROPOSAL_TYPE']+'_score'+ '.png'
     plt.savefig(plot_name)
+
+    ## Todo: Add scatter plot of the seat_score and flip_score here.
+
+
     save_obj(chain_output, config["STATE_NAME"]+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"])+str(config["PROPOSAL_TYPE"]))
 
 def save_obj(obj, name ):
@@ -336,7 +376,7 @@ if __name__ ==  '__main__':
         "INPUT_GRAPH_FILENAME" : "./jsons/NC.json",
         "X_POSITION" : "C_X",
         "Y_POSITION" : "C_Y",
-        'PARTY_A_COL': "EL16G_PR_R", 
+        'PARTY_A_COL': "EL16G_PR_R",
         'PARTY_B_COL': "EL16G_PR_D",
         "UNDERLYING_GRAPH_FILE" : "./plots/UnderlyingGraph.png",
         "WIDTH" : 1,
