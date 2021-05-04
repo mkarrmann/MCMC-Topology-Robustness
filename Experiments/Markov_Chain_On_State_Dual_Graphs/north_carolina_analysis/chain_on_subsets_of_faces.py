@@ -15,6 +15,8 @@ import networkx
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import networkx as nx
+import os
+import json
 from functools import partial
 from gerrychain.tree import bipartition_tree as bpt
 from gerrychain import Graph, MarkovChain
@@ -29,6 +31,7 @@ from gerrychain.partition import Partition
 from gerrychain.proposals import recom
 from gerrychain.metrics import mean_median, efficiency_gap
 from gerrychain.tree import recursive_tree_part, bipartition_tree_random, PopulatedGraph, contract_leaves_until_balanced_or_none, find_balanced_edge_cuts
+from collections import defaultdict
 
 def face_sierpinski_mesh(graph, special_faces):
     """'Sierpinskifies' certain faces of the graph by adding nodes and edges to
@@ -160,12 +163,12 @@ def add_edge_proposal(graph, special_faces):
                     break
 
 
-def preprocessing(path_to_json):
+def preprocessing(path_to_json, output_directory):
     """Takes file path to JSON graph, and returns the appropriate
 
     Args:
         path_to_json ([String]): path to graph in JSON format
-
+        output_directory: path of directory to save output in 
     Returns:
         graph (Gerrychain Graph): graph in JSON file following cleaning
         dual (Gerrychain Graph): planar dual of graph
@@ -176,7 +179,7 @@ def preprocessing(path_to_json):
         graph.nodes[node]['pos'] = (graph.nodes[node][config['X_POSITION']],
                                     graph.nodes[node][config['Y_POSITION']])
 
-    save_fig(graph, config['UNDERLYING_GRAPH_FILE'], config['WIDTH'])
+    save_fig(graph, output_directory + '/UnderlyingGraph.png', config['WIDTH'])
     #restricted planar dual does not include unbounded face
     dual = facefinder.restricted_planar_dual(graph)
 
@@ -204,12 +207,13 @@ def main():
         RuntimeError if PROPOSAL_TYPE of config file is neither 'sierpinski'
         nor 'convex'
     """
+    output_directory = createDirectory(config)
     epsilon = config["epsilon"]
     k = config["NUM_DISTRICTS"]
     updaters = {'population': Tally('population'),
                             'cut_edges': cut_edges,
                             }
-    graph, dual = preprocessing(config["INPUT_GRAPH_FILENAME"])
+    graph, dual = preprocessing(config["INPUT_GRAPH_FILENAME"], output_directory)
     ideal_population= sum( graph.nodes[x]["population"] for x in graph.nodes())/k
     faces = graph.graph["faces"]
     faces = list(faces)
@@ -225,7 +229,7 @@ def main():
     #faces that are currently modified. Code maintains list of modified faces, and at each step selects a face. if face is already in list,
     #the face is un-modified, and if it is not, the face is modified by the specified proposal type.
     special_faces = set( [ face for face in square_faces if np.random.uniform(0,1) < .5 ] )
-    chain_output = { 'dem_seat_data': [], 'rep_seat_data':[], 'score':[], 'seat_score' : [], 'flip_score' : [] }
+    chain_output = defaultdict(list)
     #start with small score to move in right direction
     print("Choosing", math.floor(len(faces) * config['PERCENT_FACES']), "faces of the dual graph at each step")
     max_score = -math.inf
@@ -288,11 +292,6 @@ def main():
             seats_won_for_democrats.append(dem_seats_won)
 
         seat_score  = statistics.mean(seats_won_for_republicans)
-        ##
-
-        flips_score = len(special_faces) # This is the number of edges being swapped
-
-        score = weight_seats * seats_score + weight_flips * flips_score
 
         #implement modified mattingly simulated annealing scheme, from evaluating partisan gerrymandering in wisconsin
         if i <= math.floor(steps * .67):
@@ -305,34 +304,45 @@ def main():
         weight_seats = 1
         weight_flips = -.2
         config['PERCENT_FACES'] = config['PERCENT_FACES']
+        flip_score = len(special_faces) # This is the number of edges being swapped
+
+        score = weight_seats * seat_score + weight_flips * flip_score
 
         ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
         #if the acceptance criteria is met or if it is the first step of the chain
+
         def accept_state():
             """ Accept the next state of the meta-chain and update the chain output with the proposed changes. 
                 To track any new information during the chain add a key to the dictionary and append the desired information.
                 """
+
+        def update_outputs():
+
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
             chain_output['rep_seat_data'].append(seats_won_for_republicans)
             chain_output['score'].append(score)
             chain_output['seat_score'].append(seat_score)
             chain_output['flip_score'].append(flip_score)
 
+
         def reject_state():
             """ Reject the next state of the meta-chain and propogate the current state of the meta-chain
                 """
+        def propagate_outputs():
             for key in chain_output.keys():
                 chain_output[key].append(chain_output[key][-1])
 
         if i == 1:
             #initial state, juct accept to start the chain
             accept_state()
+            update_outputs()
             special_faces = copy.deepcopy(special_faces_proposal)
         #this is the simplified form of the acceptance criteria, for intuitive purposes
         #exp((1/temperature) ( proposal_score - previous_score))
         elif np.random.uniform(0,1) < (math.exp(score) / math.exp(chain_output['score'][-1]))**(1/temperature):
             #accept changes
             accept_state()
+            update_outputs()
             special_faces = copy.deepcopy(special_faces_proposal)
         else:
             #reject changes
@@ -344,22 +354,40 @@ def main():
             nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+'sc_'+str(config['CHAIN_STEPS'])+'mcs_'+ str(config["GERRYCHAIN_STEPS"])+ "gcs_" +
                 config['PROPOSAL_TYPE']+'_'+ str(len(special_faces)), pickle.HIGHEST_PROTOCOL)
             save_obj(special_faces, 'north_carolina_highest_fouce')
+            nx.write_gpickle(proposal_graph, output_directory + '/' +  "max_score", pickle.HIGHEST_PROTOCOL)
+            f= open(output_directory + "/max_score_data.txt","w+")
+            f.write("maximum score: " + str(score) + "\n" + "edges changed: " + str(len(special_faces)) + "\n" + "Seat Score: " + str(seat_score))
+            save_obj(special_faces, output_directory + '/', "special_faces")
             max_score = score
-
 
     plt.plot(range(len(chain_output['score'])), chain_output['score'])
     plt.xlabel("Meta-Chain Step")
     plt.ylabel("Score")
-    plot_name = './plots/north_carolina/' + config["STATE_NAME"]+"_"+config['PARTY_A_COL']+'_'+str(config["CHAIN_STEPS"])+ config['PROPOSAL_TYPE']+'_score'+ '.png'
+    plot_name = output_directory + '/' + 'score'+ '.png'
     plt.savefig(plot_name)
 
     ## Todo: Add scatter plot of the seat_score and flip_score here.
 
 
-    save_obj(chain_output, config["STATE_NAME"]+str(config['CHAIN_STEPS'])+'cs,'+ str(config["GERRYCHAIN_STEPS"])+str(config["PROPOSAL_TYPE"]))
+    save_obj(chain_output, output_directory, "chain_output")
+def createDirectory(config):
+    """Creates experiment directory to track experiment configuration information and output.
+    Written by Matt Karramann.
+    Args:
+        config file for experiment 
+    """
+    num = 0
+    suffix = lambda x: f'-{x}' if x != 0 else ''
+    while os.path.exists(config['EXPERIMENT_NAME'] + suffix(num)):
+        num += 1
+    os.makedirs(config['EXPERIMENT_NAME'] + suffix(num))
+    metadataFile = os.path.join(config['EXPERIMENT_NAME'] + suffix(num), config['METADATA_FILE'])
+    with open(metadataFile, 'w') as metaFile:
+        json.dump(config, metaFile, indent=2)
+    return config['EXPERIMENT_NAME'] + suffix(num)
 
-def save_obj(obj, name ):
-    with open('obj/'+ name + '.pkl', 'wb') as f:
+def save_obj(obj, output_directory, name):
+    with open(output_directory + '/' + name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 if __name__ ==  '__main__':
     global config
@@ -374,13 +402,15 @@ if __name__ ==  '__main__':
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'random',
-        'GERRYCHAIN_STEPS' : 150,
-        'CHAIN_STEPS' : 500,
+        'GERRYCHAIN_STEPS' : 15,
+        'CHAIN_STEPS' : 25,
         "NUM_DISTRICTS": 13,
         'STATE_NAME': 'north_carolina',
         'PERCENT_FACES': .05,
         'PROPOSAL_TYPE': "add_edge",
-        'epsilon': .01
+        'epsilon': .01, 
+        "EXPERIMENT_NAME" : 'experiments/north_carolina/edge_proposal',
+        'METADATA_FILE' : "experiment_data"
     }
     # Seanna: so in here the number of districts is 12 (maybe we want to revise it?)
     main()
