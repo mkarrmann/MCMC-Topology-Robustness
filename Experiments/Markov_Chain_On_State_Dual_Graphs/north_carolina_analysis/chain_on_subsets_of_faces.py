@@ -308,51 +308,42 @@ def main():
 
         ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
         #if the acceptance criteria is met or if it is the first step of the chain
-        def update_outputs():
-
-            # Todo: Check that the scope stuff works here
+        def accept_state():
+            """ Accept the next state of the meta-chain and update the chain output with the proposed changes. 
+                To track any new information during the chain add a key to the dictionary and append the desired information.
+                """
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
             chain_output['rep_seat_data'].append(seats_won_for_republicans)
             chain_output['score'].append(score)
             chain_output['seat_score'].append(seat_score)
             chain_output['flip_score'].append(flip_score)
 
-        def propagate_outputs():
-            # Todo: Check that the scope stuff works here
+        def reject_state():
+            """ Reject the next state of the meta-chain and propogate the current state of the meta-chain
+                """
             for key in chain_output.keys():
-                chain_output[key].append(chain_output['key'][-1])
-
-            #chain_output['dem_seat_data'].append(chain_output['dem_seat_data'][-1])
-            #chain_output['rep_seat_data'].append(chain_output['rep_seat_data'][-1])
-            #chain_output['score'].append(chain_output['score'][-1])
-
+                chain_output[key].append(chain_output[key][-1])
 
         if i == 1:
-            update_outputs()
-
-            #chain_output['dem_seat_data'].append(seats_won_for_democrats)
-            #chain_output['rep_seat_data'].append(seats_won_for_republicans)
-            #chain_output['score'].append(score)
+            #initial state, juct accept to start the chain
+            accept_state()
             special_faces = copy.deepcopy(special_faces_proposal)
         #this is the simplified form of the acceptance criteria, for intuitive purposes
         #exp((1/temperature) ( proposal_score - previous_score))
         elif np.random.uniform(0,1) < (math.exp(score) / math.exp(chain_output['score'][-1]))**(1/temperature):
-            update_outputs()
-            #chain_output['dem_seat_data'].append(seats_won_for_democrats)
-            #chain_output['rep_seat_data'].append(seats_won_for_republicans)
-            #chain_output['score'].append(score)
-            #chain_output['seat_score'].append(seat_score)
-            #chain_output['flip_score'].append(flip_score)
-
+            #accept changes
+            accept_state()
             special_faces = copy.deepcopy(special_faces_proposal)
         else:
-            propagate_outputs()
+            #reject changes
+            reject_state()
 
         #if score is highest seen, save map.
         if score > max_score:
             #todo: all graph coloring for graph changes that produced this score
             nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+'sc_'+str(config['CHAIN_STEPS'])+'mcs_'+ str(config["GERRYCHAIN_STEPS"])+ "gcs_" +
                 config['PROPOSAL_TYPE']+'_'+ str(len(special_faces)), pickle.HIGHEST_PROTOCOL)
+            save_obj(special_faces, 'north_carolina_highest_fouce')
             max_score = score
 
 
