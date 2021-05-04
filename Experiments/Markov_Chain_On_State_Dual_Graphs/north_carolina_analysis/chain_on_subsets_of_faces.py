@@ -300,13 +300,11 @@ def main():
             beta = (i / math.floor(steps * .67)) * 100
         temperature = 1 / (beta)
 
-
-        weight_seats = 1
-        weight_flips = -.2
-        config['PERCENT_FACES'] = config['PERCENT_FACES']
+        weight_seats = config['WEIGHT_SEATS'] = 1
+        weight_flips = config['WEIGHT_FLIPS'] = 1
         flip_score = len(special_faces) # This is the number of edges being swapped
 
-        score = weight_seats * seat_score + weight_flips * flip_score
+        score = weight_seats * seat_score + weight_flips *  flip_score
 
         ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
         #if the acceptance criteria is met or if it is the first step of the chain
@@ -315,34 +313,27 @@ def main():
             """ Accept the next state of the meta-chain and update the chain output with the proposed changes. 
                 To track any new information during the chain add a key to the dictionary and append the desired information.
                 """
-
-        def update_outputs():
-
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
             chain_output['rep_seat_data'].append(seats_won_for_republicans)
             chain_output['score'].append(score)
             chain_output['seat_score'].append(seat_score)
             chain_output['flip_score'].append(flip_score)
 
-
         def reject_state():
             """ Reject the next state of the meta-chain and propogate the current state of the meta-chain
                 """
-        def propagate_outputs():
             for key in chain_output.keys():
                 chain_output[key].append(chain_output[key][-1])
 
         if i == 1:
             #initial state, juct accept to start the chain
             accept_state()
-            update_outputs()
             special_faces = copy.deepcopy(special_faces_proposal)
         #this is the simplified form of the acceptance criteria, for intuitive purposes
         #exp((1/temperature) ( proposal_score - previous_score))
         elif np.random.uniform(0,1) < (math.exp(score) / math.exp(chain_output['score'][-1]))**(1/temperature):
             #accept changes
             accept_state()
-            update_outputs()
             special_faces = copy.deepcopy(special_faces_proposal)
         else:
             #reject changes
@@ -353,7 +344,7 @@ def main():
             #todo: all graph coloring for graph changes that produced this score
             nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+'sc_'+str(config['CHAIN_STEPS'])+'mcs_'+ str(config["GERRYCHAIN_STEPS"])+ "gcs_" +
                 config['PROPOSAL_TYPE']+'_'+ str(len(special_faces)), pickle.HIGHEST_PROTOCOL)
-            save_obj(special_faces, 'north_carolina_highest_fouce')
+            save_obj(special_faces, output_directory, 'north_carolina_highest_found')
             nx.write_gpickle(proposal_graph, output_directory + '/' +  "max_score", pickle.HIGHEST_PROTOCOL)
             f= open(output_directory + "/max_score_data.txt","w+")
             f.write("maximum score: " + str(score) + "\n" + "edges changed: " + str(len(special_faces)) + "\n" + "Seat Score: " + str(seat_score))
@@ -402,15 +393,17 @@ if __name__ ==  '__main__':
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'random',
-        'GERRYCHAIN_STEPS' : 15,
-        'CHAIN_STEPS' : 25,
+        'GERRYCHAIN_STEPS' : 150,
+        'CHAIN_STEPS' : 750,
         "NUM_DISTRICTS": 13,
         'STATE_NAME': 'north_carolina',
         'PERCENT_FACES': .05,
         'PROPOSAL_TYPE': "add_edge",
         'epsilon': .01, 
         "EXPERIMENT_NAME" : 'experiments/north_carolina/edge_proposal',
-        'METADATA_FILE' : "experiment_data"
+        'METADATA_FILE' : "experiment_data",
+        'WEIGHT_SEATS' : 1,
+        'WEIGHT_FLIPS' : 1
     }
     # Seanna: so in here the number of districts is 12 (maybe we want to revise it?)
     main()
