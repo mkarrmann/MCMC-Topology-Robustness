@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import os
 import json
+import argparse
 from functools import partial
 from gerrychain.tree import bipartition_tree as bpt
 from gerrychain import Graph, MarkovChain
@@ -234,7 +235,7 @@ def main():
     print("Choosing", math.floor(len(faces) * config['PERCENT_FACES']), "faces of the dual graph at each step")
     max_score = -math.inf
     #this is the main markov chain
-    for i in tqdm.tqdm(range(1,steps+1), ncols = 100, desc="Chain Progress"):
+    for i in range(1,steps+1):
         special_faces_proposal = copy.deepcopy(special_faces)
         proposal_graph = copy.deepcopy(graph)
         if (config["PROPOSAL_TYPE"] == "sierpinski"):
@@ -381,6 +382,12 @@ def save_obj(obj, output_directory, name):
     with open(output_directory + '/' + name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 if __name__ ==  '__main__':
+    parser = argparse.ArgumentParser(description='Runs a metachain on the space of state dual graphs.')
+    parser.add_argument("-mcs", "--meta_chain_steps", help="Length of metachain", type=int)
+    parser.add_argument("-gcs", "--gerry_chain_steps", help="Length of gerrychain steps", type=int)
+    parser.add_argument("-ws", "--weight_seats", help="score weight of seats achieved", type=float)
+    parser.add_argument("-wf", "--weight_flips", help="Score weight of flips", type=float)
+    args = parser.parse_args()
     global config
     config = {
         "INPUT_GRAPH_FILENAME" : "./jsons/NC.json",
@@ -393,8 +400,8 @@ if __name__ ==  '__main__':
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'random',
-        'GERRYCHAIN_STEPS' : 150,
-        'CHAIN_STEPS' : 750,
+        'GERRYCHAIN_STEPS' : args.gerry_chain_steps,
+        'CHAIN_STEPS' : args.meta_chain_steps,
         "NUM_DISTRICTS": 13,
         'STATE_NAME': 'north_carolina',
         'PERCENT_FACES': .05,
@@ -402,8 +409,8 @@ if __name__ ==  '__main__':
         'epsilon': .01, 
         "EXPERIMENT_NAME" : 'experiments/north_carolina/edge_proposal',
         'METADATA_FILE' : "experiment_data",
-        'WEIGHT_SEATS' : 1,
-        'WEIGHT_FLIPS' : 1
+        'WEIGHT_SEATS' : args.weight_seats,
+        'WEIGHT_FLIPS' : args.weight_flips
     }
     # Seanna: so in here the number of districts is 12 (maybe we want to revise it?)
     main()
