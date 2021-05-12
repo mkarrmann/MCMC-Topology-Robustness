@@ -169,7 +169,7 @@ def preprocessing(path_to_json, output_directory):
 
     Args:
         path_to_json ([String]): path to graph in JSON format
-        output_directory: path of directory to save output in 
+        output_directory: path of directory to save output in
     Returns:
         graph (Gerrychain Graph): graph in JSON file following cleaning
         dual (Gerrychain Graph): planar dual of graph
@@ -311,7 +311,7 @@ def main():
         #if the acceptance criteria is met or if it is the first step of the chain
 
         def accept_state():
-            """ Accept the next state of the meta-chain and update the chain output with the proposed changes. 
+            """ Accept the next state of the meta-chain and update the chain output with the proposed changes.
                 To track any new information during the chain add a key to the dictionary and append the desired information.
                 """
             chain_output['dem_seat_data'].append(seats_won_for_democrats)
@@ -366,7 +366,7 @@ def createDirectory(config):
     """Creates experiment directory to track experiment configuration information and output.
     Written by Matt Karramann.
     Args:
-        config file for experiment 
+        config file for experiment
     """
     num = 0
     suffix = lambda x: f'-{x}' if x != 0 else ''
@@ -406,7 +406,7 @@ if __name__ ==  '__main__':
         'STATE_NAME': 'north_carolina',
         'PERCENT_FACES': .05,
         'PROPOSAL_TYPE': "add_edge",
-        'epsilon': .01, 
+        'epsilon': .01,
         "EXPERIMENT_NAME" : 'experiments/north_carolina/edge_proposal',
         'METADATA_FILE' : "experiment_data",
         'WEIGHT_SEATS' : args.weight_seats,
@@ -414,3 +414,10 @@ if __name__ ==  '__main__':
     }
     # Seanna: so in here the number of districts is 12 (maybe we want to revise it?)
     main()
+
+    '''
+    weight_pairs = np.random.normal(0,1, (100,2))
+    # Scatterplot of the seatshift, edges flipped
+    for seat shift, save both median and mean , and 5% and 95% quantiles
+    # Sense of scale, e.g. by adding a point to the scatter plot representing the original state dual graph.
+    '''
