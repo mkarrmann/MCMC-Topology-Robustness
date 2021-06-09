@@ -239,6 +239,7 @@ def main():
     for i in range(1,steps+1):
         special_faces_proposal = copy.deepcopy(special_faces)
         proposal_graph = copy.deepcopy(graph)
+        #abstract to function 
         if (config["PROPOSAL_TYPE"] == "sierpinski"):
             for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
                 face = random.choice(faces)
