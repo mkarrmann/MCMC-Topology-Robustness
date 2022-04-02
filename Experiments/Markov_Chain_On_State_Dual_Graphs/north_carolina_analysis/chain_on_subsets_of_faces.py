@@ -1,5 +1,6 @@
 ## This script will perform a markov chain on the  subset faces of the north carolina graph, picking a face UAR and sierpinskifying or de-sierpinskifying it, then running gerrychain on the graph, recording central seat tendencies.
 # the output of the chain is stored in north_carolina/plots in a pickled object.
+from email.mime import base
 import facefinder
 import numpy as np
 import pandas as pd
@@ -31,7 +32,7 @@ from gerrychain import GeographicPartition
 from gerrychain.partition import Partition
 from gerrychain.proposals import recom
 from gerrychain.metrics import mean_median, efficiency_gap
-from gerrychain.tree import recursive_tree_part, bipartition_tree_random, PopulatedGraph, contract_leaves_until_balanced_or_none, find_balanced_edge_cuts
+from gerrychain.tree import recursive_tree_part, bipartition_tree_random, PopulatedGraph
 from collections import defaultdict
 
 def face_sierpinski_mesh(graph, special_faces):
@@ -230,6 +231,39 @@ def main():
     gerrychain_steps = config["GERRYCHAIN_STEPS"]
     #faces that are currently modified. Code maintains list of modified faces, and at each step selects a face. if face is already in list,
     #the face is un-modified, and if it is not, the face is modified by the specified proposal type.
+    #compute baseline map score 
+    initial_partition = Partition(graph, assignment=config['ASSIGN_COL'], updaters=updaters)
+
+
+    # Sets up Markov chain
+    popbound = within_percent_of_ideal_population(initial_partition, epsilon)
+    tree_proposal = partial(recom, pop_col=config['POP_COL'], pop_target=ideal_population, epsilon=epsilon,
+                                node_repeats=1)
+
+
+    #make new function -- this computes the energy of the current map
+    exp_chain = MarkovChain(tree_proposal, Validator([popbound]), accept=accept.always_accept,
+                            initial_state=initial_partition, total_steps=config['BASELINE_STEPS'])
+    seats_won_for_republicans = []
+    seats_won_for_democrats = []
+    for part in exp_chain:
+        rep_seats_won = 0
+        dem_seats_won = 0
+        for j in range(k):
+            rep_votes = 0
+            dem_votes = 0
+            for n in graph.nodes():
+                if part.assignment[n] == j:
+                    rep_votes += graph.nodes[n]["EL16G_PR_R"]
+                    dem_votes += graph.nodes[n]["EL16G_PR_D"]
+            total_seats_dem = int(dem_votes > rep_votes)
+            total_seats_rep = int(rep_votes > dem_votes)
+            rep_seats_won += total_seats_rep
+            dem_seats_won += total_seats_dem
+        seats_won_for_republicans.append(rep_seats_won)
+        seats_won_for_democrats.append(dem_seats_won)
+
+    base_score  = statistics.mean(seats_won_for_republicans)
     special_faces = set( [ face for face in square_faces if np.random.uniform(0,1) < .5 ] )
     chain_output = defaultdict(list)
     #start with small score to move in right direction
@@ -239,7 +273,6 @@ def main():
     for i in range(1,steps+1):
         special_faces_proposal = copy.deepcopy(special_faces)
         proposal_graph = copy.deepcopy(graph)
-        #abstract to function 
         if (config["PROPOSAL_TYPE"] == "sierpinski"):
             for i in range(math.floor(len(faces) * config['PERCENT_FACES'])):
                 face = random.choice(faces)
@@ -296,6 +329,43 @@ def main():
 
         seat_score  = statistics.mean(seats_won_for_republicans)
 
+        # If the map we have found beats the baseline map, run gerrychain for longer to see distribution
+        if seat_score > base_score:
+            exp_chain = MarkovChain(tree_proposal, Validator([popbound]), accept=accept.always_accept,
+                                initial_state=initial_partition, total_steps=config['BASELINE_STEPS'])
+            seats_won_for_republicans = []
+            seats_won_for_democrats = []
+            for part in exp_chain:
+                rep_seats_won = 0
+                dem_seats_won = 0
+                for j in range(k):
+                    rep_votes = 0
+                    dem_votes = 0
+                    for n in graph.nodes():
+                        if part.assignment[n] == j:
+                            rep_votes += graph.nodes[n]["EL16G_PR_R"]
+                            dem_votes += graph.nodes[n]["EL16G_PR_D"]
+                    total_seats_dem = int(dem_votes > rep_votes)
+                    total_seats_rep = int(rep_votes > dem_votes)
+                    rep_seats_won += total_seats_rep
+                    dem_seats_won += total_seats_dem
+                seats_won_for_republicans.append(rep_seats_won)
+                seats_won_for_democrats.append(dem_seats_won)
+            dem_std = np.std(seats_won_for_democrats)
+            rep_std = np.std(seats_won_for_republicans)
+            final_seat_score  = statistics.mean(seats_won_for_republicans)
+            if final_seat_score > base_score:
+                nx.write_gpickle(proposal_graph, output_directory + '/' + "_highest_score_graph", pickle.HIGHEST_PROTOCOL)
+                f= open(output_directory + "/max_score_data.txt","w+")
+                f.write("final score: " + str(final_seat_score) + "\n" + "edges changed: " + str(len(special_faces)) + "\n" + "Meta-chain Score: " + str(seat_score) + '\n' "Baseline Score: " + str(base_score))
+                save_obj(special_faces, output_directory + '/', "special_faces")
+                plt.plot(range(len(chain_output['score'])), chain_output['score'])
+                plt.xlabel("Meta-Chain Step")
+                plt.ylabel("Score")
+                plot_name = output_directory + '/' + 'score'+ '.png'
+                plt.savefig(plot_name)
+            return 0
+
         #implement modified mattingly simulated annealing scheme, from evaluating partisan gerrymandering in wisconsin
         if i <= math.floor(steps * .67):
             beta = i / math.floor(steps * .67)
@@ -307,7 +377,8 @@ def main():
         weight_flips = config['WEIGHT_FLIPS'] = 1
         flip_score = len(special_faces) # This is the number of edges being swapped
 
-        score = weight_seats * seat_score + weight_flips *  flip_score
+        #score = weight_seats * seat_score + weight_flips *  flip_score
+        score = seat_score
 
         ##This is the acceptance step of the Metropolis-Hasting's algorithm. Specifically, rand < min(1, P(x')/P(x)), where P is the energy and x' is proposed state
         #if the acceptance criteria is met or if it is the first step of the chain
@@ -342,23 +413,17 @@ def main():
             #reject changes
             reject_state()
 
-        #if score is highest seen, save map.
-        if score > max_score:
-            #todo: all graph coloring for graph changes that produced this score
-            nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+'sc_'+str(config['CHAIN_STEPS'])+'mcs_'+ str(config["GERRYCHAIN_STEPS"])+ "gcs_" +
-                config['PROPOSAL_TYPE']+'_'+ str(len(special_faces)), pickle.HIGHEST_PROTOCOL)
-            save_obj(special_faces, output_directory, 'north_carolina_highest_found')
-            nx.write_gpickle(proposal_graph, output_directory + '/' +  "max_score", pickle.HIGHEST_PROTOCOL)
-            f= open(output_directory + "/max_score_data.txt","w+")
-            f.write("maximum score: " + str(score) + "\n" + "edges changed: " + str(len(special_faces)) + "\n" + "Seat Score: " + str(seat_score))
-            save_obj(special_faces, output_directory + '/', "special_faces")
-            max_score = score
-
-    plt.plot(range(len(chain_output['score'])), chain_output['score'])
-    plt.xlabel("Meta-Chain Step")
-    plt.ylabel("Score")
-    plot_name = output_directory + '/' + 'score'+ '.png'
-    plt.savefig(plot_name)
+        #if score is highest seen, save map. Commented out because will save once we have found a map that beats the baseline.
+        # if score > max_score:
+        #     #todo: all graph coloring for graph changes that produced this score
+        #     nx.write_gpickle(proposal_graph, "obj/graphs/"+str(score)+'sc_'+str(config['CHAIN_STEPS'])+'mcs_'+ str(config["GERRYCHAIN_STEPS"])+ "gcs_" +
+        #         config['PROPOSAL_TYPE']+'_'+ str(len(special_faces)), pickle.HIGHEST_PROTOCOL)
+        #     save_obj(special_faces, output_directory, 'north_carolina_highest_found')
+        #     nx.write_gpickle(proposal_graph, output_directory + '/' +  "max_score", pickle.HIGHEST_PROTOCOL)
+        #     f= open(output_directory + "/max_score_data.txt","w+")
+        #     f.write("maximum score: " + str(score) + "\n" + "edges changed: " + str(len(special_faces)) + "\n" + "Seat Score: " + str(seat_score))
+        #     save_obj(special_faces, output_directory + '/', "special_faces")
+        #     max_score = score
 
     ## Todo: Add scatter plot of the seat_score and flip_score here.
 
@@ -402,8 +467,9 @@ if __name__ ==  '__main__':
         "ASSIGN_COL" : "part",
         "POP_COL" : "population",
         'SIERPINSKI_POP_STYLE': 'random',
-        'GERRYCHAIN_STEPS' : args.gerry_chain_steps,
-        'CHAIN_STEPS' : args.meta_chain_steps,
+        'GERRYCHAIN_STEPS' : 50,
+        'CHAIN_STEPS' : 500,
+        'BASELINE_STEPS': 1000,
         "NUM_DISTRICTS": 13,
         'STATE_NAME': 'north_carolina',
         'PERCENT_FACES': .05,

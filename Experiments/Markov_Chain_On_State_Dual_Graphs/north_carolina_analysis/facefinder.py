@@ -15,7 +15,7 @@ from gerrychain import GeographicPartition
 from gerrychain.partition import Partition
 from gerrychain.proposals import recom
 from gerrychain.metrics import mean_median, efficiency_gap
-from gerrychain.tree import recursive_tree_part, bipartition_tree_random, PopulatedGraph, contract_leaves_until_balanced_or_none, find_balanced_edge_cuts
+from gerrychain.tree import recursive_tree_part, bipartition_tree_random, PopulatedGraph
 
 
 def compute_rotation_system(graph):
@@ -280,26 +280,26 @@ def test():
     draw_with_location(dual)
 def always_true(proposal):
     return True
-def my_mst_bipartition_tree_random(
-    graph,
-    pop_col,
-    pop_target,
-    epsilon,
-    node_repeats=1,
-    spanning_tree=None,
-    choice=random.choice):
-    populations = {node: graph.nodes[node][pop_col] for node in graph}
+# def my_mst_bipartition_tree_random(
+#     graph,
+#     pop_col,
+#     pop_target,
+#     epsilon,
+#     node_repeats=1,
+#     spanning_tree=None,
+#     choice=random.choice):
+#     populations = {node: graph.nodes[node][pop_col] for node in graph}
 
-    possible_cuts = []
-    if spanning_tree is None:
-        spanning_tree = get_spanning_tree_mst(graph)
+#     possible_cuts = []
+#     if spanning_tree is None:
+#         spanning_tree = get_spanning_tree_mst(graph)
 
-    while len(possible_cuts) == 0:
-        spanning_tree = get_spanning_tree_mst(graph)
-        h = PopulatedGraph(spanning_tree, populations, pop_target, epsilon)
-        possible_cuts = find_balanced_edge_cuts(h, choice=choice)
+#     while len(possible_cuts) == 0:
+#         spanning_tree = get_spanning_tree_mst(graph)
+#         h = PopulatedGraph(spanning_tree, populations, pop_target, epsilon)
+#         possible_cuts = find_balanced_edge_cuts(h, choice=choice)
 
-    return choice(possible_cuts).subset
+#     return choice(possible_cuts).subset
 def get_spanning_tree_mst(graph):
     for edge in graph.edges:
         graph.edges[edge]["weight"] = random.random()
