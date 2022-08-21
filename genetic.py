@@ -152,7 +152,10 @@ def run_chain_score(special_graph: SpecialEdgeGraph, id: str) -> float:
 
     return mean(stats)
 
-def run_chain_partition(special_graph: SpecialEdgeGraph, num_parts: int) -> Tuple[List[Partition], float]:
+def run_chain_partition(
+    special_graph: SpecialEdgeGraph,
+    num_parts: int,
+) -> Tuple[List[Partition], float]:
     """Runs Recom on graph and returns most gerrymandered partitions.
 
     Args:
