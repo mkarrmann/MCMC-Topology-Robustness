@@ -265,14 +265,14 @@ def init_special_graphs(graph: Graph) -> Tuple[List[SpecialEdgeGraph], float]:
     return special_graphs, orig_score
 
 def create_next_generation(
-    special_graphs: List[SpecialEdgeGraph],
+    prev_generation: List[SpecialEdgeGraph],
     alive: List,
 ) -> List[SpecialEdgeGraph]:
     """Creates the next generation of SpecialEdgeGraphs according to genetic
     algorithm
 
     Args:
-        special_graphs: Previous generation. Each element
+        prev_generation: Previous generation. Each element
         is a tuple of (SpecialEdgeGraph, score)
         alive: List of previous special graphs that are still alive. Each element
         is a tuple of (SpecialEdgeGraph, score)
@@ -281,7 +281,11 @@ def create_next_generation(
         Next generation of SpecialEdgeGraphs
     """
     # Sort by score
-    sorted_graphs_and_scores = sorted(special_graphs + alive, key=lambda x: x[1], reverse=True)[:2]
+    sorted_graphs_and_scores = sorted(
+        prev_generation + alive,
+        key=lambda x: x[1],
+        reverse=True,
+    )[:2]
     sorted_graphs = [g for g, _ in sorted_graphs_and_scores]
 
     # Form NUM_ASEXUAL mutations of the top graph
