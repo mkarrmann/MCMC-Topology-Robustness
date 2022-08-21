@@ -12,15 +12,16 @@ dependencies:
   - brotli=1.0.9=hb1e8313_2
   - bzip2=1.0.8=h1de35cc_0
   - c-ares=1.18.1=hca72f7f_0
-  - ca-certificates=2022.07.19=hecd8cb5_0
+  - ca-certificates=2022.6.15=h033912b_0
   - cairo=1.16.0=h1680b09_1011
-  - certifi=2022.6.15=py310hecd8cb5_0
+  - certifi=2022.6.15=py310h2ec42d9_0
   - cfitsio=4.1.0=h2c97ad1_0
   - click=8.0.4=py310hecd8cb5_0
   - click-plugins=1.1.1=pyhd3eb1b0_0
   - cligj=0.7.2=pyhd3eb1b0_0
   - curl=7.83.1=h23f1065_0
   - cycler=0.11.0=pyhd3eb1b0_0
+  - docutils=0.19=py310h2ec42d9_0
   - expat=2.4.8=h96cf925_0
   - fiona=1.8.21=py310h5a20164_2
   - font-ttf-dejavu-sans-mono=2.37=hd3eb1b0_0
@@ -43,6 +44,7 @@ dependencies:
   - hdf4=4.2.15=hefd3b78_3
   - hdf5=1.12.1=nompi_h0aa1fa2_104
   - icu=70.1=h96cf925_0
+  - iniconfig=1.1.1=pyhd3eb1b0_0
   - intel-openmp=2021.4.0=hecd8cb5_3538
   - isort=5.9.3=pyhd3eb1b0_0
   - joblib=1.1.0=pyhd3eb1b0_0
@@ -103,7 +105,7 @@ dependencies:
   - numpy=1.22.3=py310hdcd3fac_0
   - numpy-base=1.22.3=py310hfd2de13_0
   - openjpeg=2.4.0=h66ea3da_0
-  - openssl=3.0.5=hfe4f2af_0
+  - openssl=3.0.5=hb81d4ab_1
   - packaging=21.3=pyhd3eb1b0_0
   - pandas=1.4.3=py310he9d5cce_0
   - pcre=8.45=h23ab428_0
@@ -111,13 +113,16 @@ dependencies:
   - pip=22.1.2=py310hecd8cb5_0
   - pixman=0.40.0=h9ed2024_1
   - platformdirs=2.4.0=pyhd3eb1b0_0
+  - pluggy=1.0.0=py310hecd8cb5_1
   - poppler=22.04.0=hed6754a_1
   - poppler-data=0.4.11=hecd8cb5_0
   - postgresql=14.4=hd3ec586_0
   - proj=9.0.1=h05f0992_1
+  - py=1.11.0=pyhd3eb1b0_0
   - pylint=2.12.2=py310hecd8cb5_1
   - pyparsing=3.0.4=pyhd3eb1b0_0
   - pyproj=3.3.1=py310hac86e01_1
+  - pytest=7.1.2=py310hecd8cb5_0
   - python=3.10.5=hdd68b96_0_cpython
   - python-dateutil=2.8.2=pyhd3eb1b0_0
   - python_abi=3.10=2_cp310
@@ -131,10 +136,12 @@ dependencies:
   - six=1.16.0=pyhd3eb1b0_1
   - snappy=1.1.9=he9d5cce_0
   - sqlite=3.39.0=h707629a_0
+  - statistics=1.0.3.5=py310hecd8cb5_1
   - threadpoolctl=2.2.0=pyh0d69192_0
   - tiledb=2.9.5=h86bd37b_0
   - tk=8.6.12=h5d9f67b_0
   - toml=0.10.2=pyhd3eb1b0_0
+  - tomli=2.0.1=py310hecd8cb5_0
   - tqdm=4.64.0=py310hecd8cb5_0
   - typing_extensions=4.1.1=pyh06a4308_0
   - tzcode=2022a=h5eb16cf_0
