@@ -1,0 +1,21 @@
+{
+  "EXPERIMENT_NAME": "genetic_NC",
+  "NUM_ASEXUAL": 4,
+  "NUM_SEXUAL": 4,
+  "AVG_EDGE_CHANGES": 25,
+  "STD_EDGE_CHANGES": 10,
+  "NUM_PROCESSES": 4,
+  "EPSILON": 0.1,
+  "ELECTION_STATISTIC": "mean_median",
+  "GERRY_CHAIN_STEPS": 20,
+  "SCORE_CHAIN_STEPS": 20,
+  "DISTANCE_TO_METAMANDER": 2,
+  "POP_COL": "population",
+  "ASSIGN_COL": "part",
+  "ELECTION_NAME": "2016_Presidential",
+  "PARTY_A_COL" : "EL16G_PR_R",
+  "PARTY_B_COL" : "EL16G_PR_D",
+  "INPUT_GRAPH_FILE": "processed_data/NC.json",
+  "X_POSITION": "C_X",
+  "Y_POSITION": "C_Y"
+}
