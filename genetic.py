@@ -247,7 +247,7 @@ def init_special_graphs(graph: Graph) -> Tuple[List[SpecialEdgeGraph], float]:
     # plus number of asexual offspring
     num_graphs = CONFIG['NUM_ASEXUAL'] + CONFIG['NUM_SEXUAL']
     gerrys, orig_score = run_chain_partition(SpecialEdgeGraph(graph), num_graphs)
-    logging.info(f"Generated gerrymaders. Avg score: {orig_score}. Scores: {[score for score, _ in gerrys]}")
+    logging.info(f"Generated gerrymaders. Avg score: {orig_score}.")
     special_graphs = [
         SpecialEdgeGraph(graph) for _ in range(CONFIG['NUM_ASEXUAL'] + CONFIG['NUM_SEXUAL'])
     ]
