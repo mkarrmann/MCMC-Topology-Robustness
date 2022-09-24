@@ -6,20 +6,27 @@ import networkx as nx
 from networkx.readwrite import json_graph
 import numpy as np
 from collections import Counter
+from gerrychain import Graph
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--file", help="File to read from", type=str)
+# TODO you'll need to change these depending on the graph you're working with:
 X_POS = 'C_X'
 Y_POS = 'C_Y'
 
 def load_graph(file):
     """Loads graph
     """
+    if file.split('.')[-1] != 'json':
+        with open(file) as f:
+            file = file.split('.')[0] + '.json'
+            Graph.from_file(f).to_json(file)
     with open(file) as f:
         data = json.load(f)
     graph = json_graph.adjacency_graph(data)
+    print(f'Node count: {len(graph.nodes())}')
     for node in graph.nodes():
-        graph.nodes[node]['pos'] = np.array([graph.nodes[node][X_POS], graph.nodes[node][Y_POS]])
+        graph.nodes[node]['pos2'] = np.array([graph.nodes[node]['pos']['coordinates'][0], graph.nodes[node]['pos']['coordinates'][1]])
     return graph
 
 def remove_straight_line_violations(g):
@@ -61,7 +68,7 @@ def remove_straight_line_violations(g):
     # O(|E|^2) algorithm :( Will take on order of 15 minutes. Probably not possible
     # to meaningfully optimize this.
     for e1, e2 in itertools.combinations(g.edges(), 2):
-        if _do_line_segments_intersect(g.nodes[e1[0]]['pos'], g.nodes[e1[1]]['pos'], g.nodes[e2[0]]['pos'], g.nodes[e2[1]]['pos']):
+        if _do_line_segments_intersect(g.nodes[e1[0]]['pos2'], g.nodes[e1[1]]['pos2'], g.nodes[e2[0]]['pos2'], g.nodes[e2[1]]['pos2']):
             violations.append((e1, e2))
         print(e1, e2, len(violations))
 
@@ -87,7 +94,7 @@ def save_graph(g, file):
     file = os.path.join("processed_data", os.path.basename(file))
     # Pos is not JSON serializable, so we remove it.
     for node in g.nodes():
-        del g.nodes[node]['pos']
+        del g.nodes[node]['pos2']
     with open(file, 'w') as f:
         f.write(json.dumps(json_graph.adjacency_data(g), indent=2))
 
