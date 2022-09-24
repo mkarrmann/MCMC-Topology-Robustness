@@ -4,19 +4,14 @@ import os
 import argparse
 import logging
 from typing import Tuple
-from functools import partial
 from statistics import mean, median, stdev
 from typing import List
 import multiprocessing as mp
 from config import CONFIG
-from gerrychain.constraints.contiguity import affected_parts
-from gerrychain import Graph, MarkovChain
-from gerrychain.constraints import (Validator, within_percent_of_ideal_population)
-from gerrychain.updaters import Election, Tally, cut_edges
+from gerrychain import Graph
 from gerrychain.partition import Partition
-from gerrychain.proposals import recom
-from gerrychain.accept import always_accept
 from special_edge_graph import SpecialEdgeGraph
+from utils import create_directory, load_graph, create_chain, ELECTION_MAP
 
 # For reproducibility, uses gerrychain's built-in random module
 # to ensure a consistent seed.
@@ -31,116 +26,10 @@ parser.add_argument("-g", "--gerry_chain_steps", help="Length of gerrychain step
 # config module that is dynamically modified. Override to use fork in all environments.
 mp.set_start_method('fork')
 
-# Maps from name of election statistics to the appropriate function
-ELECTION_MAP = {
-    'seats' : (lambda x: x[CONFIG['ELECTION_NAME']].seats('PartyA')),
-    'won' : (lambda x: x[CONFIG['ELECTION_NAME']].seats('PartyA')),
-    'efficiency_gap' : (lambda x: x[CONFIG['ELECTION_NAME']].efficiency_gap()),
-    'mean_median' : (lambda x: x[CONFIG['ELECTION_NAME']].mean_median()),
-    'mean_thirdian' : (lambda x: x[CONFIG['ELECTION_NAME']].mean_thirdian()),
-    'partisan_bias' : (lambda x: x[CONFIG['ELECTION_NAME']].partisan_bias()),
-    'partisan_gini' : (lambda x: x[CONFIG['ELECTION_NAME']].partisan_gini()),
-}
-
-
-def create_directory() -> str:
-    """Creates experiment directory to track experiment configuration information and output.
-    Args:
-        CONFIG file for experiment
-
-    Returns:
-        String: name of experiment directory
-    """
-    num = 0
-    suffix = lambda x: f'-{x}' if x != 0 else ''
-    while os.path.exists(CONFIG['EXPERIMENT_NAME'] + suffix(num)):
-        num += 1
-    os.makedirs(CONFIG['EXPERIMENT_NAME'] + suffix(num))
-    config_file = os.path.join(CONFIG['EXPERIMENT_NAME'] + suffix(num), 'config.json')
-    with open(config_file, 'w') as f:
-        json.dump(CONFIG, f, indent=2)
-    return CONFIG['EXPERIMENT_NAME'] + suffix(num)
-
-def load_graph():
-    """Loads graph from json file, along with additional preprocessing steps.
-    Returns:
-        GerryChain.Graph object
-    """
-    graph = Graph.from_json(CONFIG['INPUT_GRAPH_FILE'])
-    for node in graph.nodes():
-        graph.nodes[node]['x'] = graph.nodes[node][CONFIG['X_POSITION']]
-        graph.nodes[node]['y'] = graph.nodes[node][CONFIG['Y_POSITION']]
-    return graph
-
-def is_original_contiguous(partition: Partition, special_graph: SpecialEdgeGraph) -> bool:
-    """ Checks if the subgraphs of the Partition, created by an MCMC step,
-    are contiguous when only considering the original graph.
-    Args:
-        partition: Partition object
-    Returns:
-        Boolean
-    """
-    return all(
-        special_graph.is_original_subgraph_connected([n for n in partition.subgraphs[part]]) \
-            for part in affected_parts(partition)
-    )
-
-def _init_chain(special_graph: SpecialEdgeGraph, num_steps: int) -> MarkovChain:
-    """Runs Recom on graph
-    Args:
-        special_graph: SpecialEdgeGraph object
-        num_steps: number of steps in the chain. If None, uses value from CONFIG
-
-    Returns:
-        MarkovChain object
-    """
-    graph = special_graph.graph
-    # List of districts in original graph
-    parts = list(set([graph.nodes[node][CONFIG['ASSIGN_COL']] for node in graph.nodes()]))
-    # Ideal population of districts
-    ideal_pop = sum([graph.nodes[node][CONFIG['POP_COL']] for node in graph.nodes()]) / len(parts)
-    election = Election(
-        CONFIG['ELECTION_NAME'],
-        {
-            'PartyA': CONFIG['PARTY_A_COL'],
-            'PartyB': CONFIG['PARTY_B_COL'],
-        }
-    )
-    updaters = {
-        'population': Tally(CONFIG['POP_COL']),
-        'cut_edges': cut_edges,
-        CONFIG['ELECTION_NAME'] : election,
-    }
-    init_part = Partition(graph=graph, assignment=CONFIG['ASSIGN_COL'], updaters=updaters)
-    popbound = within_percent_of_ideal_population(init_part, CONFIG['EPSILON'])
-    # We check if the subgraphs are contiguous under the original graph, as
-    # opposed to the modified special graph. This is because the set of valid
-    # districting plans can conceivably be considered "politically relevant",
-    # while the purpose of this experiment is to demonstrate that modifying
-    # purely politically irrelevant features can have an impact of MCMC
-    # analysis.
-    is_contiguous = partial(is_original_contiguous, special_graph=special_graph)
-
-    proposal = partial(
-        recom,
-        pop_col=CONFIG['POP_COL'],
-        pop_target=ideal_pop,
-        epsilon=CONFIG['EPSILON'],
-    )
-
-    return MarkovChain(
-        proposal=proposal,
-        constraints=Validator([popbound, is_contiguous]),
-        accept=always_accept,
-        initial_state=init_part,
-        total_steps= num_steps,
-    )
-
-
 def run_chain_score(special_graph: SpecialEdgeGraph, id: str) -> float:
     """Runs Recom on graph and returns average of election statistics.
     """
-    chain = _init_chain(special_graph, CONFIG['SCORE_CHAIN_STEPS'])
+    chain = create_chain(special_graph, CONFIG['SCORE_CHAIN_STEPS'])
     # Run chain, save stats of chosen statistic. Also saves the most gerrymandered
     # partition.
     stats = []
@@ -166,7 +55,7 @@ def run_chain_partition(
         List of Partition objects
         Average of election statistics
     """
-    chain = _init_chain(special_graph, CONFIG['GERRY_CHAIN_STEPS'])
+    chain = create_chain(special_graph, CONFIG['GERRY_CHAIN_STEPS'])
 
     # Run the chain, saving the most gerrymandered partitions.
     stats, max_parts = [], []
@@ -184,18 +73,23 @@ def run_chain_partition(
 
 def mutate_graph(special_graph: SpecialEdgeGraph) -> SpecialEdgeGraph:
     """Mutates the graph in place by adding and removing random edges"""
-    # Sample both the number of edges to remove and to add from the same normal distribution
-    num_remove = int(
-        random.gauss(CONFIG['AVG_EDGE_CHANGES'], CONFIG['STD_EDGE_CHANGES'])
-    )
-
-    special_graph.remove_random_special_edges(num_remove)
-
     num_add = int(
         random.gauss(CONFIG['AVG_EDGE_CHANGES'], CONFIG['STD_EDGE_CHANGES'])
     )
 
-    special_graph.add_random_special_edges(num_add)
+    num_added = len(special_graph.add_random_special_edges(num_add))
+
+    # The idea is to naively approximately sample num removed and num added from
+    # the same distribution. However, add_random_special_edges is more likely
+    # to not add the full number added as num_removed, creating a bias. Sample
+    # number removed from the same normal distribution, shifted according to
+    # how much less edges were added than expected.
+    num_remove = int(
+        random.gauss(CONFIG['AVG_EDGE_CHANGES'] * num_add / num_added, CONFIG['STD_EDGE_CHANGES'])
+    )
+
+    special_graph.remove_random_special_edges(num_remove)
+
 
     return special_graph
 
@@ -207,9 +101,15 @@ def init_special_graphs(graph: Graph) -> Tuple[List[SpecialEdgeGraph], float]:
         List of SpecialEdgeGraph objects
         Original graph's average election statistic
     """
-    def _set_dual_distance(special_graph: SpecialEdgeGraph, part: Partition) -> SpecialEdgeGraph:
-        """Sets the distance of each node of the dual graph from the crossing
-        edges of the partition
+    def _add_dual_scores(special_graph: SpecialEdgeGraph, part: Partition) -> SpecialEdgeGraph:
+        """Adds the dual score of the given partition to the given special graph.\
+            The dual score of a face is an indication of how close a node is to
+            one of the boundaries of the partition classes. A high score indicates
+            being close to the boundary (or on the boundary), while a low score
+            being far away.
+
+            Note that we just add to the dual score- this way we are only adding
+            on top of a dual score that was already there.
 
         Args:
             special_graph (SpecialEdgeGraph): special graph to set distance on the
@@ -228,6 +128,7 @@ def init_special_graphs(graph: Graph) -> Tuple[List[SpecialEdgeGraph], float]:
                     crossing_faces.append(face)
                     special_graph.dual.nodes[face]['distance'] = 0
 
+        score = 100 # Starting score assigned to faces on boundary
         visited, prev_nodes = set(crossing_faces), crossing_faces
         while len(visited) < special_graph.dual.number_of_nodes():
             next_nodes = []
@@ -236,9 +137,9 @@ def init_special_graphs(graph: Graph) -> Tuple[List[SpecialEdgeGraph], float]:
                     if neighbor not in visited:
                         next_nodes.append(neighbor)
                         visited.add(neighbor)
-                        special_graph.dual.nodes[neighbor]['distance'] = \
-                            special_graph.dual.nodes[node]['distance'] + 1
+                        special_graph.dual.nodes[neighbor]['score'] += score
             prev_nodes = next_nodes
+            score //= CONFIG['DUAL_SCORE_DIVISOR']
 
         return special_graph
 
@@ -301,8 +202,9 @@ def create_next_generation(
         g1 = deepcopy(sorted_graphs[0])
         g2 = deepcopy(sorted_graphs[1])
         # Randomly remove a third of each special edges
-        g1.remove_random_special_edges(int(len(g1.special_edges) / 3))
-        g2.remove_random_special_edges(int(len(g2.special_edges) / 3))
+        # TODO: trying removing this
+        #g1.remove_random_special_edges(int(len(g1.special_edges) / 3))
+        #g2.remove_random_special_edges(int(len(g2.special_edges) / 3))
         sexual_offspring.append(g1 + g2)
 
     logging.info(f"New alive: {len(set(sorted_graphs_and_scores) - set(alive))}")
