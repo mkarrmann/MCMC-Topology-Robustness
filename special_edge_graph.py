@@ -7,8 +7,6 @@ from collections import defaultdict
 from copy import deepcopy
 import itertools
 import logging
-import traceback
-import matplotlib.pyplot as plt
 
 # For reproducibility, uses gerrychain's built-in random module
 # to ensure a consistent seed.
@@ -19,6 +17,10 @@ class SpecialEdgeGraph:
     Handles adding and removing additional special edges to the base graph while
     preserving the straight-line embedding. Furthermore, special edges can only
     be added to bounded faces, not the unbounded face.
+
+    TODO: Considering performance is essentially a non-issue given the chosen
+    data structures, it'd be really nice if these objects were immutable, and
+    returned new objects when modified. It'd make the calling code cleaner.
     """
 
     class Face:
@@ -143,21 +145,28 @@ class SpecialEdgeGraph:
                 # Additionally, note that the above discussion only applies to simple
                 # polygons, while the faces of straight line embeddings are slight
                 # generalizations, as traversing the edges of a face may entail
-                # crossing the same edge multiple times. However, the unbounded
-                # face is guaranteed to be (the exterior of) a simple polygon, so
-                # this algorithm still holds in this case. In the case where we end
-                # up comparing the orientation of the same edge against itself, then
-                # the orientation is not clockwise, and therefore once again we
-                # get the correct answer.
-                min_vertex_id, min_vertex = min(enumerate(self.nodes),
-                    key=lambda v: (self._graph_nodes[v[1]]['x'], self._graph_nodes[v[1]]['y'])
+                # crossing the same edge multiple times. We must only compare
+                # consecutive edges which are distinct. If the minimum position
+                # vertex has no such pair of consecutive edges, then it must
+                # be in the unbounded face
+                min_vertex = min(
+                    self.nodes,
+                    key=lambda v: (self._graph_nodes[v]['x'],
+                    self._graph_nodes[v]['y']),
                 )
-                # Three vertices which form the two vectors (b is a shared vertex of the two).
-                a, b, c = self._graph_nodes[self.nodes[min_vertex_id - 1]], \
-                    self._graph_nodes[min_vertex], \
-                    self._graph_nodes[self.nodes[(min_vertex_id + 1) % len(self.nodes)]]
-                self._is_unbounded = self.is_clockwise(a,b,c)
-                logging.debug(f'Face {hash(self)} is unbounded: {self._is_unbounded}')
+                for i, v in enumerate(self.nodes):
+                    if v == min_vertex:
+                        a, b, c = self._graph_nodes[self.nodes[i - 1]], \
+                            self._graph_nodes[min_vertex], \
+                            self._graph_nodes[self.nodes[(i + 1) % len(self.nodes)]]
+                        if a != c:
+                            self._is_unbounded = self.is_clockwise(a,b,c)
+                            logging.debug(f'Face {hash(self)} is unbounded: {self._is_unbounded}')
+                        break
+                # No non-identical consecutive edges were found, indicating
+                # edge is only part of consecutive face
+                if self._is_unbounded is None:
+                    self._is_unbounded = True
             return self._is_unbounded
 
         @staticmethod
@@ -193,6 +202,7 @@ class SpecialEdgeGraph:
         self.dual = self._construct_restricted_dual()
         assert nx.is_connected(self.graph)
         assert nx.is_connected(self.dual)
+        assert self.unbounded_face is not None
 
     def __add__(self, other):
         """Adds two SpecialEdgeGraphs together. Returns new graphs. For root
@@ -319,6 +329,7 @@ class SpecialEdgeGraph:
         self._set_all_rotation_systems()
 
         self.dual = nx.Graph()
+        self.unbounded_face = None
 
         # Add the face corresponding to each direct edge. Note that the __hash__
         # and __eq__ ensure that duplicate faces are not added.
@@ -345,6 +356,10 @@ class SpecialEdgeGraph:
                     # Map from directed edge to its corresponding root face
                     self.graph.edges[e][directed_edge] = face.root
                     faces.append(face)
+                elif self.unbounded_face is None:
+                    # Set the unbounded face. This is not included in the restricted
+                    # dual.
+                    self.unbounded_face = face
 
             # If edge is already labelled as special, add it to special edges.
             if self.graph.edges[e].get('special', False):
@@ -712,4 +727,5 @@ class SpecialEdgeGraph:
                 adj[i] = {k: v for k, v in e.items() if type(k) != tuple}
         with open(filename, 'w') as f:
             f.write(json.dumps(g, indent=2))
+
 
