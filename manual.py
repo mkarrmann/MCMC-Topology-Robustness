@@ -191,53 +191,6 @@ def init_parts(graph: Graph) -> List[Partition]:
         ))
     return parts
 
-    #blue_nodes = [
-    #    n for n in graph.nodes if (graph.nodes[n]['PRES16D'] + graph.nodes[n]['PRES16R'] > 0 and \
-    #    graph.nodes[n]['PRES16D'] - graph.nodes[n]['PRES16R']) \
-    #    / (graph.nodes[n]['PRES16D'] + graph.nodes[n]['PRES16R'] + 1) > 0.15
-    #]
-    #blue_graph = graph.subgraph(blue_nodes)
-    #from collections import Counter
-    #logging.info(Counter([len(comp) for comp in connected_components(blue_graph)]))
-    #for comp in connected_components(blue_graph):
-    #    if len(comp) > 200:
-    #        try:
-    #            g = SpecialEdgeGraph(graph.subgraph(comp))
-    #            logging.info(g.unbounded_face.nodes)
-    #        except AssertionError:
-    #            # TODO remove
-    #            logging.warning("uh oh")
-    #            logging.warning([n for n in comp])
-    #            g = SpecialEdgeGraph(graph.subgraph(comp))
-    #            for face in g.dual.nodes():
-    #                logging.warning(face.nodes)
-    #            ns = graph.subgraph(comp)
-    #            import networkx as nx
-    #            nx.draw(ns, pos={n: (ns.nodes[n]['x'], ns.nodes[n]['y']) for n in ns.nodes}, with_labels=True)
-    #            import matplotlib.pyplot as plt
-    #            plt.show()
-    #logging.info(f'Connected components: {len(list(connected_components(blue_graph)))}')
-    ## Number of graphs per generation is equal to the number of sexual offspring
-    ## plus number of asexual offspring
-    #num_graphs = CONFIG['NUM_ASEXUAL'] + CONFIG['NUM_SEXUAL']
-    #gerrys, orig_score = run_chain_partition(SpecialEdgeGraph(graph), num_graphs)
-    #logging.info(f"Generated gerrymaders. Avg score: {orig_score}.")
-    #special_graphs = [
-    #    SpecialEdgeGraph(graph) for _ in range(CONFIG['NUM_ASEXUAL'] + CONFIG['NUM_SEXUAL'])
-    #]
-
-    ## Metamander around gerrys.
-    #for graph, gerry in zip(special_graphs, gerrys):
-    #    _set_dual_distance(graph, gerry)
-    #    faces = list(graph.dual.nodes(data=True))
-    #    for face in faces:
-    #        # Add a random edge to every face sufficiently far away from boundary
-    #        # of corresponding gerrymandered partition.
-    #        if face[1]['distance'] > CONFIG['DISTANCE_TO_METAMANDER']:
-    #            graph.add_random_edge(face[0])
-
-    #return special_graphs, orig_score
-
 def main():
     """Runs "manual" algorithm for metamandering graph
     """
