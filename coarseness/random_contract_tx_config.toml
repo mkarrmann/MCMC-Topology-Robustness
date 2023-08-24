@@ -1,0 +1,27 @@
+CONTRACTIONS_PER_STEP = 750
+INPUT_GRAPH_FILE = "TX_vtds_clean.json"
+EXPERIMENT_NAME = "TX_simple_contract"
+CHAIN_NUM_STEPS = 50000
+# Too small of a value risks making balanced partitions impossible or creating
+# degree 1 nodes. TODO: putting this much lower results in failure to find balanced
+# partitions. Try figuring out a way around this without setting epsilon too high.
+# Also worth remembering that even if no errors are seen, you could be qualatatively
+# changing the nature of the chain
+MIN_BLOCKS = 2500
+BEGIN_CONTRACT_EPSILON = 0.01
+END_CONTRACT_EPSILON = 0.15
+
+NUM_PROCESSES = 10
+EPSILON = 0.3
+ELECTION_STATISTIC = "mean_median"
+NUM_PARTS = 38
+DISTANCE_TO_METAMANDER = 3
+DUAL_SCORE_DIVISOR = 3
+POP_COL = "TOTPOP"
+ASSIGN_COL = "USCD"
+ELECTION_NAME = "2016_Presidential"
+PARTY_A_COL = "PRES16R"
+PARTY_B_COL = "PRES16D"
+X_POSITION = "C_X"
+Y_POSITION = "C_Y"
+SCORE_FUNC = "score_by_party"
