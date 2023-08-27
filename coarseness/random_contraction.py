@@ -227,7 +227,7 @@ def random_condense(
         # so it's fine.
         if max_pop < float("inf") and i % 100000 == 0:
             logger.warning(
-                f"Increase max_pop from {max_pop} to {max_pop := max_pop * 1.1}"
+                f"Increase max_pop from {max_pop} to {(max_pop := max_pop * 1.1)}"
             )
 
 
