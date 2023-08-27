@@ -225,7 +225,7 @@ def random_condense(
         # This is all obviously very naive and slow, but this is simple, and relatively
         # little time is spent contracting the graphs compared to running the chains,
         # so it's fine.
-        if max_pop < float("inf") and i % 100000 == 0:
+        if max_pop < float("inf") and i % 1000000 == 0:
             logger.warning(
                 f"Increase max_pop from {max_pop} to {(max_pop := max_pop * 1.1)}"
             )
