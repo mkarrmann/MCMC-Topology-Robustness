@@ -373,10 +373,12 @@ def _generate_gerrys_large_memory(
     naive approach, allowing for a larger diversity of gerrys to easily be
     returned. If this doesn't crash, then this should always be used.
     """
+    logging.info("To begin chain to generate gerrys")
     chain = create_chain(
         graph,
         num_steps=num_base_steps,
     )
+    logging.info("Chain complete")
 
     parts = [part for part in chain]
 
@@ -426,6 +428,7 @@ def _contract_around_assignment(
         graph = random_condense(graph, assign=assign, props=props, max_pop=max_pop)
         if i % contractions_per_step == 0:
             graphs.append(graph)
+            logger.info(f"Contractions {len(graphs)} to {len(graph)} nodes")
 
     return graphs
 
