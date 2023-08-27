@@ -383,6 +383,8 @@ def _generate_gerrys_large_memory(
     ]
 
     # For each desired seats won, return the greatest and least efficiency gap
+    # This is mostly just a natural way to ensure that we get two very different
+    # gerrymanders per seats won
     return tuple(nested_parts[i][j] for i in GERRYS_TO_STORE for j in (0, -1))
 
 
