@@ -196,6 +196,7 @@ def random_condense(
     graph: nx.Graph,
     assign: dict,
     props: list[str],
+    max_pop: int | float = float("inf"),
 ) -> nx.Graph:
     """Randomly contracts a pair of adjacent nodes
 
@@ -208,13 +209,26 @@ def random_condense(
     if len(graph.edges) == 0:
         return graph
 
+    i = 0
     while True:
         u, v = random.choice(list(graph.edges))
         # Only contract if it doesn't break the partition
-        if assign[u] == assign[v]:
+        if (
+            assign[u] == assign[v]
+            and graph.nodes[u][CONFIG["POP_COL"]] + graph.nodes[v][CONFIG["POP_COL"]]
+            < max_pop
+        ):
             return condense(graph, u, v, props)
         else:
             logger.debug(f"Skipping contraction between {u} and {v}")
+        i += 1
+        # This is all obviously very naive and slow, but this is simple, and relatively
+        # little time is spent contracting the graphs compared to running the chains,
+        # so it's fine.
+        if max_pop < float("inf") and i % 100000 == 0:
+            logger.warning(
+                f"Increase max_pop from {max_pop} to {max_pop := max_pop * 1.1}"
+            )
 
 
 def generate_random_contractions(
@@ -393,6 +407,7 @@ def _contract_around_assignment(
     assign: dict,  # type: ignore
     props: list[str],
     contractions_per_step: int,
+    max_pop: int | float = float("inf"),
 ) -> list[nx.Graph]:
     num_districts = len(set(assign.values()))
     graphs = [graph]
@@ -400,10 +415,10 @@ def _contract_around_assignment(
 
     while len(graph) > num_districts:
         i += 1
-        # We continue to contract around the original assignmnent. Even though
+        # We continue to contract around the original assignment. Even though
         # old nodes will still remain in assign, the assignment of any given
         # node never changes, so will still be valid.
-        graph = random_condense(graph, assign=assign, props=props)
+        graph = random_condense(graph, assign=assign, props=props, max_pop=max_pop)
         if i % contractions_per_step == 0:
             graphs.append(graph)
 
@@ -442,12 +457,18 @@ def generate_gerry_contractions(
         epsilon,
     )
 
+    if CONFIG["CAP_MAX_POP"]:
+        largest_pop = int(max(n[CONFIG["POP_COL"]] for n in graph.nodes.values()))  # type: ignore
+    else:
+        largest_pop = float("inf")
+
     graphs: list[list[nx.Graph]] = [
         _contract_around_assignment(
             graph,
             gerry.assignment.to_dict(),
             props,
             CONFIG["CONTRACTIONS_PER_STEP"],
+            max_pop=largest_pop,
         )
         for gerry in gerries
     ]
