@@ -456,6 +456,8 @@ def generate_gerry_contractions(
     #    False,
     # )
 
+    logger.info("To generate gerries")
+
     gerries = _generate_gerrys_large_memory(
         graph,
         num_parts,
@@ -464,13 +466,17 @@ def generate_gerry_contractions(
         epsilon,
     )
 
+    logger.info("Generated gerries")
+
     if CONFIG["CAP_MAX_POP"]:
         largest_pop = int(max(n[CONFIG["POP_COL"]] for n in graph.nodes.values()))  # type: ignore
     else:
         largest_pop = float("inf")
 
+    logger.info(f"To contract around gerries starting with {largest_pop} max pop")
+
     graphs: list[list[nx.Graph]] = []
-    for gerry in gerries:
+    for i, gerry in enumerate(gerries):
         graphs_ = _contract_around_assignment(
             graph,
             gerry.assignment.to_dict(),
@@ -479,12 +485,15 @@ def generate_gerry_contractions(
             max_pop=largest_pop,
         )
         graphs.append(graphs_)
+        logger.info(f"Contracted around gerry {i} out of {len(gerries)}")
 
     max_pops = [
         max(g.nodes[node][CONFIG["POP_COL"]] for node in g.nodes())
         for graphs_ in graphs
         for g in graphs_
     ]
+
+    logger.info(f"Max pops: {max_pops}")
 
     with open(
         os.path.join(
@@ -494,6 +503,8 @@ def generate_gerry_contractions(
         "w",
     ) as f:
         json.dump(max_pops, f)
+
+    logger.info("Contracted around gerries")
 
     return graphs, gerries
 
