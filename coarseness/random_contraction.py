@@ -378,9 +378,9 @@ def _generate_gerrys_large_memory(
         graph,
         num_steps=num_base_steps,
     )
-    logging.info("Chain complete")
 
     parts = [part for part in chain]
+    logging.info("Chain complete")
 
     # convert partition to nested dict, gathered by and sorted by seats won
     nested_parts_dict = defaultdict(list)
@@ -811,5 +811,7 @@ if __name__ == "__main__":
             .decode("utf-8")
             .strip()
         )
+
+    logging.info(CONFIG)
 
     main()
