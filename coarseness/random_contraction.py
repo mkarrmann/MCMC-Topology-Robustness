@@ -469,16 +469,31 @@ def generate_gerry_contractions(
     else:
         largest_pop = float("inf")
 
-    graphs: list[list[nx.Graph]] = [
-        _contract_around_assignment(
+    graphs: list[list[nx.Graph]] = []
+    for gerry in gerries:
+        graphs_ = _contract_around_assignment(
             graph,
             gerry.assignment.to_dict(),
             props,
             CONFIG["CONTRACTIONS_PER_STEP"],
             max_pop=largest_pop,
         )
-        for gerry in gerries
+        graphs.append(graphs_)
+
+    max_pops = [
+        max(g.nodes[node][CONFIG["POP_COL"]] for node in g.nodes())
+        for graphs_ in graphs
+        for g in graphs_
     ]
+
+    with open(
+        os.path.join(
+            CONFIG["EXPERIMENT_NAME"],
+            "max_pops.json",
+        ),
+        "w",
+    ) as f:
+        json.dump(max_pops, f)
 
     return graphs, gerries
 
