@@ -231,8 +231,8 @@ def random_condense(
         # little time is spent contracting the graphs compared to running the chains,
         # so it's fine.
         if max_pop < float("inf") and i % 1_000_000 == 0:
-            logger.warning(f"Increase max_pop from {max_pop} to {max_pop * 1.1}")
-            max_pop *= 1.1
+            logger.warning(f"Increase max_pop from {max_pop} to {max_pop * 1.05}")
+            max_pop *= 1.05
 
 
 def generate_random_contractions(
