@@ -227,12 +227,11 @@ def random_condense(
         else:
             logger.debug(f"Skipping contraction between {u} and {v}")
         i += 1
-        # This is all obviously very naive and slow, but this is simple, and relatively
-        # little time is spent contracting the graphs compared to running the chains,
-        # so it's fine.
-        if max_pop < float("inf") and i % 1_000_000 == 0:
-            logger.warning(f"Increase max_pop from {max_pop} to {max_pop * 1.05}")
-            max_pop *= 1.05
+        # 50% increase is very large, but it seems we only start hitting this at
+        # the very end, so it's fine to be a bit aggressive.
+        if max_pop < float("inf") and i % 500_000 == 0:
+            logger.warning(f"Increase max_pop from {max_pop} to {max_pop * 1.5}")
+            max_pop *= 1.5
 
 
 def generate_random_contractions(
