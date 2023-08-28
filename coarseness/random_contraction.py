@@ -201,8 +201,8 @@ def random_condense(
     graph: nx.Graph,
     assign: dict,
     props: list[str],
-    max_pop: int | float = float("inf"),
-) -> nx.Graph:
+    max_pop: float = float("inf"),
+) -> tuple[nx.Graph, float]:
     """Randomly contracts a pair of adjacent nodes
 
     Args:
@@ -223,14 +223,14 @@ def random_condense(
             and graph.nodes[u][CONFIG["POP_COL"]] + graph.nodes[v][CONFIG["POP_COL"]]
             < max_pop
         ):
-            return condense(graph, u, v, props)
+            return condense(graph, u, v, props), max_pop
         else:
             logger.debug(f"Skipping contraction between {u} and {v}")
         i += 1
         # This is all obviously very naive and slow, but this is simple, and relatively
         # little time is spent contracting the graphs compared to running the chains,
         # so it's fine.
-        if max_pop < float("inf") and i % 1000000 == 0:
+        if max_pop < float("inf") and i % 1_000_000 == 0:
             logger.warning(f"Increase max_pop from {max_pop} to {max_pop * 1.1}")
             max_pop *= 1.1
 
@@ -288,7 +288,7 @@ def generate_random_contractions(
         )
         logger.info("Generated new seed part for contracting")
         for _ in range(CONFIG["CONTRACTIONS_PER_STEP"]):
-            graph = random_condense(graph, assign=assign, props=props)
+            graph, _ = random_condense(graph, assign=assign, props=props)
         contractions.append(graph)
         logger.info(f"Contractions {len(contractions)} to {len(graph)} nodes")
 
@@ -424,7 +424,9 @@ def _contract_around_assignment(
         # We continue to contract around the original assignment. Even though
         # old nodes will still remain in assign, the assignment of any given
         # node never changes, so will still be valid.
-        graph = random_condense(graph, assign=assign, props=props, max_pop=max_pop)
+        graph, max_pop = random_condense(
+            graph, assign=assign, props=props, max_pop=max_pop
+        )
         if i % contractions_per_step == 0:
             graphs.append(graph)
             logger.info(f"Contractions {len(graphs)} to {len(graph)} nodes")
