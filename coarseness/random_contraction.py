@@ -212,7 +212,7 @@ def random_condense(
     """
 
     if len(graph.edges) == 0:
-        return graph
+        return graph, max_pop
 
     i = 0
     while True:
